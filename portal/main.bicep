@@ -57,6 +57,8 @@ param tags object = {
 
 // Variables
 var logAnalyticsName = 'log-azure-operator-${uniqueString(resourceGroupName)}'
+// Construct resource ID for listKeys() - must be compile-time evaluable
+var logAnalyticsResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.OperationalInsights/workspaces', logAnalyticsName)
 
 // Resource Group
 resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
@@ -140,9 +142,13 @@ module containerGroup 'modules/containerGroup.bicep' = {
     // 2. Container logs are non-sensitive operational telemetry
     // 3. AMA migration requires DCR infrastructure not yet implemented
     logAnalyticsWorkspaceId: createLogAnalytics ? logAnalytics.outputs.customerId : ''
-    logAnalyticsWorkspaceKey: createLogAnalytics ? listKeys(logAnalytics.outputs.resourceId, '2022-10-01').primarySharedKey : ''
+    // Use pre-computed resource ID for listKeys() to satisfy compile-time requirement
+    logAnalyticsWorkspaceKey: createLogAnalytics ? listKeys(logAnalyticsResourceId, '2022-10-01').primarySharedKey : ''
     tags: tags
   }
+  dependsOn: [
+    logAnalytics // Ensure Log Analytics is created before listKeys() is called
+  ]
 }
 
 // Outputs
