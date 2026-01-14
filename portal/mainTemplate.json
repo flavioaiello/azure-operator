@@ -206,7 +206,7 @@
     },
     "containerImage": {
       "type": "string",
-      "defaultValue": "ghcr.io/azure-operator/azure-operator:latest",
+      "defaultValue": "ghcr.io/flavioaiello/azure-operator:latest",
       "metadata": {
         "description": "Operator container image."
       }

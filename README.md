@@ -1,5 +1,9 @@
 # Azure Landing Zone Operator
 
+> **"Azure Landing Zones should have been built this way from the start."**
+>
+> *Continuous reconciliation. Secretless. GitOps-native. The operator pattern that cloud infrastructure deserves.*
+
 A **Python-based, stateless operator framework** for continuously reconciling Azure Landing Zones. Inspired by Kubernetes controller patterns, designed for Azure's unique characteristics.
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fflavioaiello%2Fazure-operator%2Fmain%2Fportal%2FmainTemplate.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fflavioaiello%2Fazure-operator%2Fmain%2Fportal%2FcreateUiDefinition.json)

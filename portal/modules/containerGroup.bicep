@@ -16,7 +16,7 @@ param containerGroupName string = 'azure-operator-bootstrap'
 param location string = resourceGroup().location
 
 @description('Operator container image')
-param operatorImage string = 'ghcr.io/azure-operator/azure-operator:latest'
+param operatorImage string = 'ghcr.io/flavioaiello/azure-operator:latest'
 
 @description('Git-sync container image')
 param gitSyncImage string = 'registry.k8s.io/git-sync/git-sync:v4.2.1'

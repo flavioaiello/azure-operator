@@ -44,7 +44,7 @@ param reconcileIntervalSeconds int = 300
 param dryRun bool = false
 
 @description('Operator container image')
-param containerImage string = 'ghcr.io/azure-operator/azure-operator:latest'
+param containerImage string = 'ghcr.io/flavioaiello/azure-operator:latest'
 
 @description('Create a new Log Analytics workspace')
 param createLogAnalytics bool = true

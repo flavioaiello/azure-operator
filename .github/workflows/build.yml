@@ -1,12 +1,12 @@
 # Container Build & Push Pipeline
 #
-# Builds the operator container image and pushes to Azure Container Registry.
-# Uses OIDC (Workload Identity Federation) for secretless authentication.
+# Builds the operator container image and pushes to GitHub Container Registry.
+# Uses GITHUB_TOKEN for secretless authentication (no external credentials needed).
 #
 # SECURITY:
-# - No secrets stored in GitHub - uses OIDC federation
+# - No secrets stored - uses built-in GITHUB_TOKEN
 # - Builds use distroless base image (minimal attack surface)
-# - Images are signed and scanned before push
+# - Images are scanned before push
 
 name: Build & Push Container
 
@@ -34,22 +34,12 @@ on:
         type: string
 
 permissions:
-  id-token: write  # Required for OIDC
   contents: read
-  packages: write  # For GHCR (optional fallback)
+  packages: write  # Required for GHCR
 
 env:
-  # Azure Container Registry
-  ACR_NAME: ${{ vars.ACR_NAME }}
-  ACR_RESOURCE_GROUP: ${{ vars.ACR_RESOURCE_GROUP }}
-  
-  # Image naming
-  IMAGE_NAME: azure-operator
-  
-  # Azure OIDC
-  AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-  AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-  AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -66,13 +56,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Login to GHCR (uses built-in GITHUB_TOKEN)
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       # Generate image metadata (tags, labels)
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             # Use input tag if provided via workflow_dispatch
             type=raw,value=${{ inputs.image_tag }},enable=${{ inputs.image_tag != '' }}
@@ -120,11 +118,10 @@ jobs:
           echo "✅ Image tests passed"
 
   push:
-    name: Push to ACR
+    name: Push to GHCR
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
     
     steps:
       - name: Checkout code
@@ -133,18 +130,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # OIDC login to Azure (secretless)
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
+      # Login to GHCR
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          client-id: ${{ env.AZURE_CLIENT_ID }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-
-      # Login to ACR using Azure CLI token
-      - name: Login to ACR
-        run: |
-          az acr login --name ${{ env.ACR_NAME }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # Generate image metadata
       - name: Docker metadata
@@ -152,7 +144,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha,prefix=,format=short
             type=raw,value=latest
@@ -176,7 +168,7 @@ jobs:
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest'
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'HIGH,CRITICAL'
@@ -194,7 +186,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Registry | \`${{ env.ACR_NAME }}.azurecr.io\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Registry | \`${{ env.REGISTRY }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Image | \`${{ env.IMAGE_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Tag | \`${{ steps.meta.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Digest | \`${{ steps.build.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY

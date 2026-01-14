@@ -418,7 +418,7 @@
             "name": "containerImage",
             "type": "Microsoft.Common.TextBox",
             "label": "Operator Container Image",
-            "defaultValue": "ghcr.io/azure-operator/azure-operator:latest",
+            "defaultValue": "ghcr.io/flavioaiello/azure-operator:latest",
             "toolTip": "Container image for the operator.",
             "constraints": {
               "required": true
