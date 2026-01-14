@@ -10,7 +10,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# Note: lib/policies/ is tracked (ALZ policy library)
+# Only ignore lib/ for venv compatibility
 lib64/
 parts/
 sdist/
