@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Compiled ARM templates (generated at build)
+templates/
+
+# Bicep Configuration
+bicepconfig.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+AGENTS.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+
+# Secrets (never commit)
+*.pem
+*.key
+secrets/
+.env
+.env.*
+
+# Terraform (removed, but ignore any leftovers)
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.example.tfvars
+
+# Build artifacts
+*.zip
+*.tar.gz
+
+# Vendor (if using)
+vendor/

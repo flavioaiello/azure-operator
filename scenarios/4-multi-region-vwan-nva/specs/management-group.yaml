@@ -1,0 +1,41 @@
+# Management Group Hierarchy Spec
+# Operator: management-group
+
+apiVersion: alz.azure.com/v1alpha1
+kind: ManagementGroupSpec
+
+metadata:
+  name: alz-management-groups
+
+spec:
+  # Root management group (typically your tenant root or a dedicated ALZ root)
+  rootManagementGroupId: contoso  # CHANGE: Your root MG ID
+  rootManagementGroupName: Contoso
+
+  # ALZ hierarchy structure
+  hierarchy:
+    platform:
+      displayName: Platform
+      children:
+        - id: management
+          displayName: Management
+        - id: connectivity
+          displayName: Connectivity
+        - id: identity
+          displayName: Identity
+    landingZones:
+      displayName: Landing Zones
+      children:
+        - id: corp
+          displayName: Corp
+        - id: online
+          displayName: Online
+    sandbox:
+      displayName: Sandbox
+    decommissioned:
+      displayName: Decommissioned
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator

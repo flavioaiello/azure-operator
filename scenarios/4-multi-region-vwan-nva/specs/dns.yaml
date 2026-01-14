@@ -1,0 +1,88 @@
+# Private DNS Zones Spec
+# Operator: dns
+
+apiVersion: alz.azure.com/v1alpha1
+kind: DnsSpec
+
+metadata:
+  name: dns-westeurope
+
+spec:
+  location: global  # DNS zones are global
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-dns
+
+  # Private DNS zones for Azure Private Endpoints
+  privateDnsZones:
+    # Storage
+    - name: privatelink.blob.core.windows.net
+      linkToHubVnet: true
+    - name: privatelink.file.core.windows.net
+      linkToHubVnet: true
+    - name: privatelink.queue.core.windows.net
+      linkToHubVnet: true
+    - name: privatelink.table.core.windows.net
+      linkToHubVnet: true
+    - name: privatelink.dfs.core.windows.net
+      linkToHubVnet: true
+    - name: privatelink.web.core.windows.net
+      linkToHubVnet: true
+
+    # Key Vault
+    - name: privatelink.vaultcore.azure.net
+      linkToHubVnet: true
+
+    # SQL
+    - name: privatelink.database.windows.net
+      linkToHubVnet: true
+
+    # Container Registry
+    - name: privatelink.azurecr.io
+      linkToHubVnet: true
+
+    # App Services / Functions
+    - name: privatelink.azurewebsites.net
+      linkToHubVnet: true
+    - name: scm.privatelink.azurewebsites.net
+      linkToHubVnet: true
+
+    # Azure Monitor
+    - name: privatelink.monitor.azure.com
+      linkToHubVnet: true
+    - name: privatelink.oms.opinsights.azure.com
+      linkToHubVnet: true
+    - name: privatelink.ods.opinsights.azure.com
+      linkToHubVnet: true
+    - name: privatelink.agentsvc.azure-automation.net
+      linkToHubVnet: true
+
+    # Cosmos DB
+    - name: privatelink.documents.azure.com
+      linkToHubVnet: true
+
+    # Event Hub / Service Bus
+    - name: privatelink.servicebus.windows.net
+      linkToHubVnet: true
+
+    # Azure Kubernetes Service
+    - name: privatelink.westeurope.azmk8s.io
+      linkToHubVnet: true
+
+  # Hub VNet to link DNS zones to
+  hubVirtualNetwork:
+    name: vnet-hub-westeurope
+    resourceGroup: rg-alz-connectivity-westeurope
+    subscriptionId: ""  # Connectivity subscription
+
+  # Azure DNS Private Resolver (optional - for hybrid DNS)
+  privateDnsResolver:
+    enabled: false
+    # name: dnspr-hub-westeurope
+    # inboundEndpoints: []
+    # outboundEndpoints: []
+    # forwardingRulesets: []
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator

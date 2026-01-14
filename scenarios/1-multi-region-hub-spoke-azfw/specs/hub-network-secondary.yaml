@@ -1,0 +1,69 @@
+# Hub Virtual Network Spec - Secondary Region
+# Operator: hub-network
+
+apiVersion: alz.azure.com/v1alpha1
+kind: HubNetworkSpec
+
+metadata:
+  name: hub-network-northeurope
+
+spec:
+  location: northeurope  # Secondary region
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-connectivity-northeurope
+
+  hub:
+    name: vnet-hub-northeurope
+    addressSpace: "10.1.0.0/16"  # Different from primary
+    
+    subnets:
+      - name: AzureFirewallSubnet
+        addressPrefix: "10.1.0.0/24"
+      - name: AzureFirewallManagementSubnet
+        addressPrefix: "10.1.1.0/24"
+      - name: GatewaySubnet
+        addressPrefix: "10.1.2.0/24"
+      - name: AzureBastionSubnet
+        addressPrefix: "10.1.3.0/24"
+      - name: snet-management
+        addressPrefix: "10.1.10.0/24"
+        networkSecurityGroup:
+          rules:
+            - name: AllowBastionInbound
+              priority: 100
+              direction: Inbound
+              access: Allow
+              protocol: Tcp
+              sourceAddressPrefix: "10.1.3.0/24"
+              destinationPortRanges: ["22", "3389"]
+              destinationAddressPrefix: "*"
+            - name: DenyAllInbound
+              priority: 4096
+              direction: Inbound
+              access: Deny
+              protocol: "*"
+              sourceAddressPrefix: "*"
+              destinationPortRange: "*"
+              destinationAddressPrefix: "*"
+      - name: snet-shared-services
+        addressPrefix: "10.1.20.0/24"
+
+    ddosProtection:
+      enabled: false
+
+  # Peering to primary hub (for multi-region connectivity)
+  peerings:
+    - name: peer-to-westeurope
+      remoteVirtualNetwork:
+        name: vnet-hub-westeurope
+        resourceGroup: rg-alz-connectivity-westeurope
+        subscriptionId: ""  # Same connectivity subscription
+      allowVirtualNetworkAccess: true
+      allowForwardedTraffic: true
+      allowGatewayTransit: false
+      useRemoteGateways: false
+
+  tags:
+    environment: production
+    scenario: "1-multi-region-hub-spoke-azfw"
+    managedBy: azure-operator

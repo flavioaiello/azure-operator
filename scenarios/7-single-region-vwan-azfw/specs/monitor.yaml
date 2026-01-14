@@ -1,0 +1,77 @@
+# Monitor / Data Collection Rules Spec
+# Operator: monitor
+
+apiVersion: alz.azure.com/v1alpha1
+kind: MonitorSpec
+
+metadata:
+  name: alz-monitor
+
+spec:
+  location: westeurope
+  subscriptionId: ""  # CHANGE: Your management subscription ID
+  resourceGroupName: rg-alz-management
+
+  # Log Analytics workspace to send data to
+  logAnalyticsWorkspace:
+    name: log-alz-management
+    resourceGroup: rg-alz-management
+
+  # Data Collection Rules
+  dataCollectionRules:
+    - name: dcr-alz-vm-insights
+      description: VM Insights data collection
+      kind: Linux
+      dataSources:
+        performanceCounters:
+          - name: VMInsightsPerfCounters
+            streams: ["Microsoft-InsightsMetrics"]
+            samplingFrequencyInSeconds: 60
+            counterSpecifiers:
+              - "\\VmInsights\\DetailedMetrics"
+        syslog:
+          - name: syslog
+            streams: ["Microsoft-Syslog"]
+            facilityNames: ["auth", "authpriv", "daemon", "kern", "syslog"]
+            logLevels: ["Warning", "Error", "Critical", "Alert", "Emergency"]
+      destinations:
+        logAnalytics:
+          - workspaceResourceId: ""  # Set during deployment
+            name: log-alz-management
+      dataFlows:
+        - streams: ["Microsoft-InsightsMetrics", "Microsoft-Syslog"]
+          destinations: ["log-alz-management"]
+
+    - name: dcr-alz-security
+      description: Security event collection
+      kind: Windows
+      dataSources:
+        windowsEventLogs:
+          - name: securityEvents
+            streams: ["Microsoft-SecurityEvent"]
+            xPathQueries:
+              - "Security!*[System[(Level=1 or Level=2 or Level=3)]]"
+      destinations:
+        logAnalytics:
+          - workspaceResourceId: ""
+            name: log-alz-management
+      dataFlows:
+        - streams: ["Microsoft-SecurityEvent"]
+          destinations: ["log-alz-management"]
+
+  # Action Groups for alerts
+  actionGroups:
+    - name: ag-alz-critical
+      shortName: ALZCritical
+      emailReceivers:
+        - name: SecurityTeam
+          emailAddress: security@contoso.com  # CHANGE: Your email
+      enabled: true
+
+  # Metric Alerts
+  alerts: []
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator

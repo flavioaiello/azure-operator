@@ -1,0 +1,114 @@
+# Custom Roles & RBAC Spec
+# Operator: role
+#
+# ALZ RBAC follows least-privilege principles:
+# https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/landing-zone/design-area/identity-access
+
+apiVersion: alz.azure.com/v1alpha1
+kind: RoleSpec
+
+metadata:
+  name: alz-roles
+
+spec:
+  # Root management group for role definitions
+  managementGroupId: contoso  # CHANGE: Your root MG ID
+
+  # Custom role definitions (ALZ-aligned)
+  customRoles:
+    # Platform team roles
+    - name: Platform-Owners
+      description: Full control over platform management groups (Management, Connectivity, Identity, Security)
+      permissions:
+        actions:
+          - "*"
+        notActions:
+          - "Microsoft.Authorization/*/Delete"
+          - "Microsoft.Authorization/elevateAccess/Action"
+        dataActions: []
+        notDataActions: []
+      assignableScopes:
+        - /providers/Microsoft.Management/managementGroups/platform
+
+    - name: Network-Management
+      description: Manage networking resources in Connectivity subscription
+      permissions:
+        actions:
+          - "Microsoft.Network/*"
+          - "Microsoft.Resources/subscriptions/resourceGroups/read"
+          - "Microsoft.Resources/deployments/*"
+          - "Microsoft.Insights/alertRules/*"
+          - "Microsoft.Support/*"
+        notActions:
+          - "Microsoft.Network/expressRouteCircuits/delete"
+          - "Microsoft.Network/vpnGateways/delete"
+          - "Microsoft.Network/virtualNetworkGateways/delete"
+        dataActions: []
+        notDataActions: []
+      assignableScopes:
+        - /providers/Microsoft.Management/managementGroups/connectivity
+
+    - name: Security-Operations
+      description: SecOps team role for Security subscription and SIEM tooling
+      permissions:
+        actions:
+          - "Microsoft.Security/*"
+          - "Microsoft.SecurityInsights/*"
+          - "Microsoft.OperationsManagement/*"
+          - "Microsoft.OperationalInsights/workspaces/*"
+          - "Microsoft.Insights/alertRules/*"
+          - "Microsoft.Insights/components/*"
+          - "Microsoft.Resources/subscriptions/resourceGroups/read"
+          - "Microsoft.Resources/deployments/*"
+          - "Microsoft.Support/*"
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      assignableScopes:
+        - /providers/Microsoft.Management/managementGroups/security
+
+    # Landing zone team roles
+    - name: Application-Owners
+      description: Application team role for managing workloads in landing zones
+      permissions:
+        actions:
+          - "Microsoft.Resources/subscriptions/resourceGroups/*"
+          - "Microsoft.Resources/deployments/*"
+          - "Microsoft.Insights/alertRules/*"
+          - "Microsoft.Insights/components/*"
+          - "Microsoft.Insights/actionGroups/*"
+          - "Microsoft.Compute/*"
+          - "Microsoft.Storage/*"
+          - "Microsoft.Web/*"
+          - "Microsoft.Sql/*"
+          - "Microsoft.KeyVault/*"
+          - "Microsoft.ContainerService/*"
+          - "Microsoft.Support/*"
+        notActions:
+          - "Microsoft.Authorization/*/Delete"
+          - "Microsoft.Authorization/*/Write"
+          - "Microsoft.Network/virtualNetworks/subnets/join/action"
+        dataActions: []
+        notDataActions: []
+      assignableScopes:
+        - /providers/Microsoft.Management/managementGroups/landingzones
+
+    - name: Subscription-Owner
+      description: Full control over a specific landing zone subscription
+      permissions:
+        actions:
+          - "*"
+        notActions:
+          - "Microsoft.Authorization/elevateAccess/Action"
+          - "Microsoft.Blueprint/blueprintAssignments/write"
+          - "Microsoft.Blueprint/blueprintAssignments/delete"
+        dataActions: []
+        notDataActions: []
+      assignableScopes:
+        - /providers/Microsoft.Management/managementGroups/landingzones
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator
+    alzVersion: "2024-07"

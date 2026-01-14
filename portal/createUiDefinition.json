@@ -1,0 +1,485 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+  "handler": "Microsoft.Azure.CreateUIDef",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "config": {
+      "isWizard": true,
+      "basics": {
+        "description": "## Azure Landing Zones Operator\n\nThis wizard deploys the **azure-operator** - a Kubernetes-style reconciliation operator that continuously manages your Azure Landing Zone configuration.\n\n### What gets deployed:\n- **Bootstrap Identity** - User-Assigned Managed Identity with RBAC\n- **Operator Container** - ACI running the reconciliation loop\n- **Git-Sync Sidecar** - Pulls YAML specs from your Git repository\n- **Monitoring** - Log Analytics workspace for operator logs\n\n### How it works:\n1. Operator pulls desired state from Git (YAML specs)\n2. Compares with actual Azure state using ARM WhatIf\n3. Automatically reconciles any drift\n4. Repeats on configurable interval\n\n**Secretless Architecture**: All authentication uses Managed Identity - no secrets stored.",
+        "location": {
+          "label": "Region",
+          "resourceTypes": ["Microsoft.ManagedIdentity/userAssignedIdentities", "Microsoft.ContainerInstance/containerGroups"]
+        }
+      }
+    },
+    "basics": [
+      {
+        "name": "resourceGroupName",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Resource Group Name",
+        "placeholder": "rg-azure-operator",
+        "defaultValue": "rg-azure-operator",
+        "toolTip": "Resource group where operator infrastructure will be deployed.",
+        "constraints": {
+          "required": true,
+          "regex": "^[a-zA-Z0-9-_]{1,90}$",
+          "validationMessage": "Resource group name must be 1-90 characters, alphanumeric, hyphens, and underscores only."
+        }
+      }
+    ],
+    "steps": [
+      {
+        "name": "identity",
+        "label": "Identity & RBAC",
+        "subLabel": {
+          "preValidation": "Configure the bootstrap identity and permissions",
+          "postValidation": "Done"
+        },
+        "bladeTitle": "Identity Configuration",
+        "elements": [
+          {
+            "name": "identityInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Info",
+              "text": "The bootstrap identity requires elevated permissions to provision downstream operator identities. Use the minimum scope necessary for your landing zone."
+            }
+          },
+          {
+            "name": "bootstrapIdentityName",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Bootstrap Identity Name",
+            "defaultValue": "uami-azure-operator-bootstrap",
+            "toolTip": "Name for the bootstrap User-Assigned Managed Identity.",
+            "constraints": {
+              "required": true,
+              "regex": "^[a-zA-Z][a-zA-Z0-9-_]{2,127}$",
+              "validationMessage": "Must start with letter, 3-128 chars, alphanumeric/hyphens/underscores."
+            }
+          },
+          {
+            "name": "rbacScope",
+            "type": "Microsoft.Common.DropDown",
+            "label": "RBAC Scope",
+            "defaultValue": "Subscription",
+            "toolTip": "Scope at which the bootstrap identity will have Owner permissions.",
+            "constraints": {
+              "required": true,
+              "allowedValues": [
+                { "label": "Subscription", "value": "subscription" },
+                { "label": "Management Group", "value": "managementGroup" }
+              ]
+            }
+          },
+          {
+            "name": "managementGroupId",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Management Group ID",
+            "placeholder": "e.g., root-mg or Tenant Root Group",
+            "toolTip": "ID of the management group (required if RBAC scope is Management Group).",
+            "visible": "[equals(steps('identity').rbacScope, 'managementGroup')]",
+            "constraints": {
+              "required": "[equals(steps('identity').rbacScope, 'managementGroup')]",
+              "regex": "^[a-zA-Z0-9-_]{1,90}$",
+              "validationMessage": "Management group ID must be 1-90 alphanumeric characters."
+            }
+          },
+          {
+            "name": "securityNote",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Warning",
+              "text": "The bootstrap identity will be granted Owner role at the selected scope. After initial setup, downstream operators use least-privilege identities."
+            }
+          }
+        ]
+      },
+      {
+        "name": "operators",
+        "label": "Operators",
+        "subLabel": {
+          "preValidation": "Select which operators to deploy",
+          "postValidation": "Done"
+        },
+        "bladeTitle": "Operator Selection",
+        "elements": [
+          {
+            "name": "operatorInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Info",
+              "text": "Each operator manages a specific domain of your landing zone. Select the operators you need - you can add more later by updating your Git specs."
+            }
+          },
+          {
+            "name": "operatorTopology",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Network Topology",
+            "defaultValue": "Hub-Spoke",
+            "toolTip": "Select your network topology to determine which connectivity operators to deploy.",
+            "constraints": {
+              "required": true,
+              "allowedValues": [
+                { "label": "Hub-Spoke (Traditional)", "value": "hubSpoke" },
+                { "label": "Virtual WAN", "value": "vwan" }
+              ]
+            }
+          },
+          {
+            "name": "hubSpokeOperators",
+            "type": "Microsoft.Common.Section",
+            "label": "Hub-Spoke Operators",
+            "visible": "[equals(steps('operators').operatorTopology, 'hubSpoke')]",
+            "elements": [
+              {
+                "name": "enableFirewall",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Azure Firewall Operator",
+                "defaultValue": true
+              },
+              {
+                "name": "enableBastion",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Azure Bastion Operator",
+                "defaultValue": true
+              },
+              {
+                "name": "enableVpnGateway",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "VPN Gateway Operator",
+                "defaultValue": false
+              },
+              {
+                "name": "enableExpressRoute",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "ExpressRoute Operator",
+                "defaultValue": false
+              },
+              {
+                "name": "enableDns",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Private DNS Operator",
+                "defaultValue": true
+              },
+              {
+                "name": "enableHubNetwork",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Hub Network Operator",
+                "defaultValue": true
+              }
+            ]
+          },
+          {
+            "name": "vwanOperators",
+            "type": "Microsoft.Common.Section",
+            "label": "Virtual WAN Operators",
+            "visible": "[equals(steps('operators').operatorTopology, 'vwan')]",
+            "elements": [
+              {
+                "name": "enableVwan",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Virtual WAN Operator",
+                "defaultValue": true
+              },
+              {
+                "name": "enableVwanHub",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Virtual Hub Operator",
+                "defaultValue": true
+              },
+              {
+                "name": "enableVwanFirewall",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Secured Hub (Firewall) Operator",
+                "defaultValue": true
+              },
+              {
+                "name": "enableVwanVpn",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "vWAN VPN Gateway Operator",
+                "defaultValue": false
+              },
+              {
+                "name": "enableVwanExpressRoute",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "vWAN ExpressRoute Operator",
+                "defaultValue": false
+              }
+            ]
+          },
+          {
+            "name": "managementOperators",
+            "type": "Microsoft.Common.Section",
+            "label": "Management Operators",
+            "elements": [
+              {
+                "name": "enableLogAnalytics",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Log Analytics Operator",
+                "defaultValue": true
+              },
+              {
+                "name": "enableAutomation",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Automation Account Operator",
+                "defaultValue": false
+              },
+              {
+                "name": "enableMonitor",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Azure Monitor Operator",
+                "defaultValue": true
+              }
+            ]
+          },
+          {
+            "name": "securityOperators",
+            "type": "Microsoft.Common.Section",
+            "label": "Security Operators",
+            "elements": [
+              {
+                "name": "enableDefender",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Defender for Cloud Operator",
+                "defaultValue": true
+              },
+              {
+                "name": "enableSentinel",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft Sentinel Operator",
+                "defaultValue": false
+              },
+              {
+                "name": "enableKeyVault",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Key Vault Operator",
+                "defaultValue": false
+              }
+            ]
+          },
+          {
+            "name": "governanceOperators",
+            "type": "Microsoft.Common.Section",
+            "label": "Governance Operators",
+            "elements": [
+              {
+                "name": "enablePolicy",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Azure Policy Operator",
+                "defaultValue": true
+              },
+              {
+                "name": "enableManagementGroups",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Management Groups Operator",
+                "defaultValue": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "gitConfig",
+        "label": "Git Configuration",
+        "subLabel": {
+          "preValidation": "Configure the Git repository for specs",
+          "postValidation": "Done"
+        },
+        "bladeTitle": "Git Repository",
+        "elements": [
+          {
+            "name": "gitInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Info",
+              "text": "The operator pulls YAML specifications from a Git repository. The git-sync sidecar keeps specs synchronized."
+            }
+          },
+          {
+            "name": "gitRepoUrl",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Git Repository URL",
+            "placeholder": "https://github.com/org/landing-zone-specs.git",
+            "toolTip": "HTTPS URL of the Git repository containing YAML specs.",
+            "constraints": {
+              "required": true,
+              "regex": "^https:\\/\\/.+\\.git$",
+              "validationMessage": "Must be an HTTPS Git URL ending in .git"
+            }
+          },
+          {
+            "name": "gitBranch",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Branch",
+            "defaultValue": "main",
+            "toolTip": "Git branch to sync from.",
+            "constraints": {
+              "required": true,
+              "regex": "^[a-zA-Z0-9/_-]+$",
+              "validationMessage": "Invalid branch name."
+            }
+          },
+          {
+            "name": "gitSpecsPath",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Specs Path",
+            "defaultValue": "specs/",
+            "toolTip": "Path within the repository containing YAML spec files.",
+            "constraints": {
+              "required": true,
+              "regex": "^[a-zA-Z0-9/_-]+\\/?$",
+              "validationMessage": "Invalid path format."
+            }
+          },
+          {
+            "name": "gitAuthSection",
+            "type": "Microsoft.Common.Section",
+            "label": "Authentication (Optional)",
+            "elements": [
+              {
+                "name": "gitAuthNote",
+                "type": "Microsoft.Common.InfoBox",
+                "visible": true,
+                "options": {
+                  "icon": "Info",
+                  "text": "For private repositories, provide a personal access token. The token is stored as a Kubernetes secret in the container."
+                }
+              },
+              {
+                "name": "gitUsername",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Git Username",
+                "placeholder": "Leave empty for public repos",
+                "toolTip": "Username for Git authentication.",
+                "constraints": {
+                  "required": false
+                }
+              },
+              {
+                "name": "gitToken",
+                "type": "Microsoft.Common.PasswordBox",
+                "label": {
+                  "password": "Personal Access Token"
+                },
+                "toolTip": "PAT with read access to the repository.",
+                "constraints": {
+                  "required": false
+                },
+                "options": {
+                  "hideConfirmation": true
+                }
+              }
+            ]
+          },
+          {
+            "name": "syncInterval",
+            "type": "Microsoft.Common.Slider",
+            "label": "Git Sync Interval (seconds)",
+            "min": 30,
+            "max": 600,
+            "defaultValue": 60,
+            "showStepMarkers": false,
+            "toolTip": "How often to check for spec changes in Git."
+          }
+        ]
+      },
+      {
+        "name": "advanced",
+        "label": "Advanced",
+        "subLabel": {
+          "preValidation": "Configure advanced settings",
+          "postValidation": "Done"
+        },
+        "bladeTitle": "Advanced Settings",
+        "elements": [
+          {
+            "name": "reconcileInterval",
+            "type": "Microsoft.Common.Slider",
+            "label": "Reconcile Interval (seconds)",
+            "min": 60,
+            "max": 3600,
+            "defaultValue": 300,
+            "showStepMarkers": false,
+            "toolTip": "How often each operator runs its reconciliation loop."
+          },
+          {
+            "name": "dryRun",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Enable Dry-Run Mode",
+            "defaultValue": false,
+            "toolTip": "When enabled, operators detect drift but don't apply changes."
+          },
+          {
+            "name": "containerImage",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Operator Container Image",
+            "defaultValue": "ghcr.io/azure-operator/azure-operator:latest",
+            "toolTip": "Container image for the operator.",
+            "constraints": {
+              "required": true
+            }
+          },
+          {
+            "name": "logAnalyticsSection",
+            "type": "Microsoft.Common.Section",
+            "label": "Monitoring",
+            "elements": [
+              {
+                "name": "createLogAnalytics",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Create new Log Analytics workspace",
+                "defaultValue": true
+              },
+              {
+                "name": "existingLogAnalyticsId",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Existing Log Analytics Workspace ID",
+                "placeholder": "/subscriptions/.../resourceGroups/.../providers/Microsoft.OperationalInsights/workspaces/...",
+                "visible": "[not(steps('advanced').logAnalyticsSection.createLogAnalytics)]",
+                "constraints": {
+                  "required": "[not(steps('advanced').logAnalyticsSection.createLogAnalytics)]"
+                }
+              }
+            ]
+          },
+          {
+            "name": "tags",
+            "type": "Microsoft.Common.TagsByResource",
+            "resources": [
+              "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "Microsoft.ContainerInstance/containerGroups",
+              "Microsoft.OperationalInsights/workspaces"
+            ],
+            "toolTip": "Tags to apply to deployed resources."
+          }
+        ]
+      }
+    ],
+    "outputs": {
+      "location": "[location()]",
+      "resourceGroupName": "[basics('resourceGroupName')]",
+      "bootstrapIdentityName": "[steps('identity').bootstrapIdentityName]",
+      "rbacScope": "[steps('identity').rbacScope]",
+      "managementGroupId": "[if(equals(steps('identity').rbacScope, 'managementGroup'), steps('identity').managementGroupId, '')]",
+      "operatorTopology": "[steps('operators').operatorTopology]",
+      "enabledOperators": "[createArray(if(and(equals(steps('operators').operatorTopology, 'hubSpoke'), steps('operators').hubSpokeOperators.enableFirewall), 'firewall', ''), if(and(equals(steps('operators').operatorTopology, 'hubSpoke'), steps('operators').hubSpokeOperators.enableBastion), 'bastion', ''), if(and(equals(steps('operators').operatorTopology, 'hubSpoke'), steps('operators').hubSpokeOperators.enableVpnGateway), 'vpn-gateway', ''), if(and(equals(steps('operators').operatorTopology, 'hubSpoke'), steps('operators').hubSpokeOperators.enableExpressRoute), 'expressroute', ''), if(and(equals(steps('operators').operatorTopology, 'hubSpoke'), steps('operators').hubSpokeOperators.enableDns), 'dns', ''), if(and(equals(steps('operators').operatorTopology, 'hubSpoke'), steps('operators').hubSpokeOperators.enableHubNetwork), 'hub-network', ''), if(and(equals(steps('operators').operatorTopology, 'vwan'), steps('operators').vwanOperators.enableVwan), 'vwan', ''), if(and(equals(steps('operators').operatorTopology, 'vwan'), steps('operators').vwanOperators.enableVwanHub), 'vwan-hub', ''), if(and(equals(steps('operators').operatorTopology, 'vwan'), steps('operators').vwanOperators.enableVwanFirewall), 'vwan-firewall', ''), if(and(equals(steps('operators').operatorTopology, 'vwan'), steps('operators').vwanOperators.enableVwanVpn), 'vwan-vpn-gateway', ''), if(and(equals(steps('operators').operatorTopology, 'vwan'), steps('operators').vwanOperators.enableVwanExpressRoute), 'vwan-expressroute', ''), if(steps('operators').managementOperators.enableLogAnalytics, 'log-analytics', ''), if(steps('operators').managementOperators.enableAutomation, 'automation', ''), if(steps('operators').managementOperators.enableMonitor, 'monitor', ''), if(steps('operators').securityOperators.enableDefender, 'defender', ''), if(steps('operators').securityOperators.enableSentinel, 'sentinel', ''), if(steps('operators').securityOperators.enableKeyVault, 'keyvault', ''), if(steps('operators').governanceOperators.enablePolicy, 'policy-operator', ''), if(steps('operators').governanceOperators.enableManagementGroups, 'management-group', ''))]",
+      "gitRepoUrl": "[steps('gitConfig').gitRepoUrl]",
+      "gitBranch": "[steps('gitConfig').gitBranch]",
+      "gitSpecsPath": "[steps('gitConfig').gitSpecsPath]",
+      "gitUsername": "[steps('gitConfig').gitAuthSection.gitUsername]",
+      "gitToken": "[steps('gitConfig').gitAuthSection.gitToken]",
+      "gitSyncInterval": "[steps('gitConfig').syncInterval]",
+      "reconcileInterval": "[steps('advanced').reconcileInterval]",
+      "dryRun": "[steps('advanced').dryRun]",
+      "containerImage": "[steps('advanced').containerImage]",
+      "createLogAnalytics": "[steps('advanced').logAnalyticsSection.createLogAnalytics]",
+      "existingLogAnalyticsId": "[if(steps('advanced').logAnalyticsSection.createLogAnalytics, '', steps('advanced').logAnalyticsSection.existingLogAnalyticsId)]",
+      "tags": "[steps('advanced').tags]"
+    }
+  }
+}

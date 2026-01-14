@@ -1,0 +1,59 @@
+# Microsoft Defender for Cloud Spec
+# Operator: defender
+
+apiVersion: alz.azure.com/v1alpha1
+kind: DefenderSpec
+
+metadata:
+  name: alz-defender
+
+spec:
+  # Defender is configured at management group scope
+  managementGroupId: contoso  # CHANGE: Your root MG ID
+
+  # Auto-provisioning settings
+  autoProvisioning:
+    logAnalytics: "On"
+    vulnerabilityAssessment: "On"
+
+  # Defender plans to enable
+  enabledPlans:
+    - name: VirtualMachines
+      pricingTier: Standard
+      subPlan: P2
+    - name: SqlServers
+      pricingTier: Standard
+    - name: AppServices
+      pricingTier: Standard
+    - name: StorageAccounts
+      pricingTier: Standard
+      subPlan: DefenderForStorageV2
+    - name: Containers
+      pricingTier: Standard
+    - name: KeyVaults
+      pricingTier: Standard
+    - name: Arm
+      pricingTier: Standard
+    - name: Dns
+      pricingTier: Standard
+    - name: OpenSourceRelationalDatabases
+      pricingTier: Standard
+    - name: CosmosDbs
+      pricingTier: Standard
+
+  # Security contacts
+  securityContacts:
+    - email: security@contoso.com  # CHANGE: Your security team email
+      phone: ""
+      alertNotifications: "On"
+      alertsToAdmins: "On"
+
+  # Continuous export to Log Analytics
+  continuousExport:
+    enabled: true
+    workspaceResourceId: ""  # Set to Log Analytics workspace ID
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator

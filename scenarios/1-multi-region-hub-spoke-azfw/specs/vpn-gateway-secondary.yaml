@@ -1,0 +1,61 @@
+# VPN Gateway Spec - Secondary Region
+# Operator: vpn-gateway
+
+apiVersion: alz.azure.com/v1alpha1
+kind: VpnGatewaySpec
+
+metadata:
+  name: vpn-gateway-northeurope
+
+spec:
+  location: northeurope  # Secondary region
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-connectivity-northeurope
+
+  vpnGateway:
+    name: vpngw-hub-northeurope
+    sku: VpnGw2AZ
+    gatewayType: Vpn
+    vpnType: RouteBased
+    vpnGatewayGeneration: Generation2
+    activeActive: true
+    
+    enableBgp: true
+    bgpSettings:
+      asn: 65516  # Different ASN from primary
+      peerWeight: 0
+
+    virtualNetwork:
+      name: vnet-hub-northeurope
+      resourceGroup: rg-alz-connectivity-northeurope
+
+  publicIpAddresses:
+    - name: pip-vpngw-hub-northeurope-1
+      sku: Standard
+      allocationMethod: Static
+      zones: ["1", "2", "3"]
+    - name: pip-vpngw-hub-northeurope-2
+      sku: Standard
+      allocationMethod: Static
+      zones: ["1", "2", "3"]
+
+  # VNet-to-VNet connection to primary region
+  connections:
+    - name: conn-to-westeurope
+      connectionType: Vnet2Vnet
+      enableBgp: true
+      sharedKey: ""  # CHANGE: Use Key Vault reference
+      remoteVirtualNetworkGateway:
+        name: vpngw-hub-westeurope
+        resourceGroup: rg-alz-connectivity-westeurope
+
+  diagnosticSettings:
+    logAnalyticsWorkspace:
+      name: log-alz-management
+      resourceGroup: rg-alz-management
+      subscriptionId: ""
+
+  tags:
+    environment: production
+    scenario: "1-multi-region-hub-spoke-azfw"
+    managedBy: azure-operator

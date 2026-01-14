@@ -1,0 +1,62 @@
+# Management Group Hierarchy Spec
+# Operator: management-group
+#
+# This hierarchy follows the official Azure Landing Zones (ALZ) reference architecture:
+# https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/landing-zone/design-area/resource-org-management-groups
+
+apiVersion: alz.azure.com/v1alpha1
+kind: ManagementGroupSpec
+
+metadata:
+  name: alz-management-groups
+
+spec:
+  # Intermediate root management group (directly under tenant root)
+  # This provides a prefix so you don't use the tenant root directly
+  rootManagementGroupId: contoso  # CHANGE: Your organization prefix (e.g., contoso, fabrikam)
+  rootManagementGroupDisplayName: Contoso  # CHANGE: Your organization display name
+
+  # ALZ hierarchy structure (official Microsoft reference architecture)
+  # See: https://aka.ms/alz/mgmt
+  hierarchy:
+    # Platform management group - contains shared services
+    platform:
+      displayName: Platform
+      children:
+        # Management subscription hosts monitoring, logging, automation
+        - id: management
+          displayName: Management
+        # Connectivity subscription hosts networking (hub, firewall, DNS)
+        - id: connectivity
+          displayName: Connectivity
+        # Identity subscription hosts AD DS / Entra Domain Services
+        - id: identity
+          displayName: Identity
+        # Security subscription hosts SIEM, Sentinel, security tooling
+        - id: security
+          displayName: Security
+
+    # Landing Zones management group - contains application workloads
+    landingZones:
+      displayName: Landing Zones
+      children:
+        # Corp - workloads requiring hybrid/corporate network connectivity
+        - id: corp
+          displayName: Corp
+        # Online - workloads with direct internet connectivity
+        - id: online
+          displayName: Online
+
+    # Sandbox - isolated environment for experimentation
+    sandbox:
+      displayName: Sandbox
+
+    # Decommissioned - canceled subscriptions awaiting deletion (30-60 days)
+    decommissioned:
+      displayName: Decommissioned
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator
+    alzVersion: "2024-07"

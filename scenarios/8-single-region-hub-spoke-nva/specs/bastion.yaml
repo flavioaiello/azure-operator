@@ -1,0 +1,61 @@
+# Azure Bastion Spec
+# Operator: bastion
+
+apiVersion: alz.azure.com/v1alpha1
+kind: BastionSpec
+
+metadata:
+  name: bastion-westeurope
+
+spec:
+  location: westeurope
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-connectivity-westeurope
+
+  bastion:
+    name: bas-hub-westeurope
+    
+    # SKU: Basic or Standard
+    # Standard adds: native client, shareable links, upload/download
+    sku: Standard
+    
+    # Scale units (Standard SKU only, 2-50)
+    scaleUnits: 2
+    
+    # Features (Standard SKU)
+    enableTunneling: true       # Native client support
+    enableShareableLink: false  # Shareable links (audit implications)
+    enableIpConnect: false      # IP-based connection
+    enableFileCopy: true        # File upload/download
+    enableKerberos: false       # Kerberos auth
+
+    # Link to hub VNet
+    virtualNetwork:
+      name: vnet-hub-westeurope
+      resourceGroup: rg-alz-connectivity-westeurope
+      subnetName: AzureBastionSubnet
+
+  # Public IP for Bastion
+  publicIpAddress:
+    name: pip-bas-hub-westeurope
+    sku: Standard
+    allocationMethod: Static
+    zones:
+      - "1"
+      - "2"
+      - "3"
+
+  # Diagnostic settings
+  diagnosticSettings:
+    logAnalyticsWorkspace:
+      name: log-alz-management
+      resourceGroup: rg-alz-management
+      subscriptionId: ""  # Management subscription
+    logs:
+      - category: BastionAuditLogs
+        enabled: true
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator

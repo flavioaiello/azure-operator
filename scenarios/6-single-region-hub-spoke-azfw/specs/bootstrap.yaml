@@ -1,0 +1,184 @@
+# Bootstrap Cascade Specification
+# 
+# This spec defines all operator identities for Single-Region Hub-Spoke + Azure Firewall.
+# The bootstrap operator provisions these identities BEFORE other operators start.
+#
+# DEPLOYMENT ORDER:
+# 1. Infrastructure deploys Bootstrap operator with Owner at Root MG
+# 2. Bootstrap operator reads this spec, creates UAMIs + RBAC
+# 3. Other operators start, wait for their identity, then begin reconciliation
+#
+# SECURITY: All tokens remain ephemeral via IMDS. Only identity infrastructure is created.
+
+apiVersion: azure-operator/v1
+kind: BootstrapOperator
+metadata:
+  name: operator-identities
+
+spec:
+  # CHANGE: Update to your Azure region
+  location: westeurope
+  
+  # CHANGE: Resource group for operator identities (UAMIs)
+  identityResourceGroup: rg-operator-identities
+  
+  # CHANGE: Resource group for operator ACI containers
+  operatorsResourceGroup: rg-operators
+  
+  # CHANGE: ACR for operator images
+  containerRegistry: youracr.azurecr.io
+  operatorImageTag: latest
+  
+  # Wait 2 minutes for Azure AD RBAC replication
+  rbacPropagationSeconds: 120
+  
+  # Deploy operators as ACI containers after identity provisioning
+  deployOperators: true
+  
+  tags:
+    environment: production
+    managedBy: azure-operator-bootstrap
+    scenario: single-region-hub-spoke-azfw
+
+  # ============================================================================
+  # Operator Identity Definitions
+  # ============================================================================
+  operators:
+    # --------------------------------------------------------------------------
+    # Connectivity Operators (Target: Connectivity Subscription)
+    # --------------------------------------------------------------------------
+    - name: firewall
+      displayName: "Azure Operator - Firewall"
+      scope: subscription
+      # CHANGE: Your connectivity subscription ID
+      subscriptionId: "00000000-0000-0000-0000-000000000000"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "Network Contributor"
+          # CHANGE: Scope to your connectivity subscription
+          scope: "/subscriptions/00000000-0000-0000-0000-000000000000"
+          description: "Manage Azure Firewall resources"
+
+    - name: hub-network
+      displayName: "Azure Operator - Hub Network"
+      scope: subscription
+      subscriptionId: "00000000-0000-0000-0000-000000000000"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "Network Contributor"
+          scope: "/subscriptions/00000000-0000-0000-0000-000000000000"
+          description: "Manage Hub VNet and subnets"
+
+    - name: bastion
+      displayName: "Azure Operator - Bastion"
+      scope: subscription
+      subscriptionId: "00000000-0000-0000-0000-000000000000"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "Network Contributor"
+          scope: "/subscriptions/00000000-0000-0000-0000-000000000000"
+          description: "Manage Azure Bastion"
+
+    - name: dns
+      displayName: "Azure Operator - DNS"
+      scope: subscription
+      subscriptionId: "00000000-0000-0000-0000-000000000000"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "Private DNS Zone Contributor"
+          scope: "/subscriptions/00000000-0000-0000-0000-000000000000"
+          description: "Manage Private DNS zones"
+
+    # --------------------------------------------------------------------------
+    # Management Operators (Target: Management Subscription)
+    # --------------------------------------------------------------------------
+    - name: log-analytics
+      displayName: "Azure Operator - Log Analytics"
+      scope: subscription
+      # CHANGE: Your management subscription ID
+      subscriptionId: "11111111-1111-1111-1111-111111111111"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "Log Analytics Contributor"
+          scope: "/subscriptions/11111111-1111-1111-1111-111111111111"
+          description: "Manage Log Analytics workspaces"
+
+    - name: automation
+      displayName: "Azure Operator - Automation"
+      scope: subscription
+      subscriptionId: "11111111-1111-1111-1111-111111111111"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "Automation Contributor"
+          scope: "/subscriptions/11111111-1111-1111-1111-111111111111"
+          description: "Manage Automation accounts"
+
+    - name: monitor
+      displayName: "Azure Operator - Monitor"
+      scope: subscription
+      subscriptionId: "11111111-1111-1111-1111-111111111111"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "Monitoring Contributor"
+          scope: "/subscriptions/11111111-1111-1111-1111-111111111111"
+          description: "Manage DCRs and alerts"
+
+    # --------------------------------------------------------------------------
+    # Security Operators (Target: Security Subscription)
+    # --------------------------------------------------------------------------
+    - name: defender
+      displayName: "Azure Operator - Defender"
+      scope: subscription
+      # CHANGE: Your security subscription ID
+      subscriptionId: "22222222-2222-2222-2222-222222222222"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "Security Admin"
+          scope: "/subscriptions/22222222-2222-2222-2222-222222222222"
+          description: "Configure Defender for Cloud"
+
+    # --------------------------------------------------------------------------
+    # Governance Operators (Target: Root Management Group)
+    # --------------------------------------------------------------------------
+    - name: management-group
+      displayName: "Azure Operator - Management Groups"
+      scope: management_group
+      # CHANGE: Your root management group ID
+      managementGroupId: "root-mg"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "Management Group Contributor"
+          # CHANGE: Scope to your root management group
+          scope: "/providers/Microsoft.Management/managementGroups/root-mg"
+          description: "Manage management group hierarchy"
+
+    - name: policy-operator
+      displayName: "Azure Operator - Policy"
+      scope: management_group
+      managementGroupId: "root-mg"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "Resource Policy Contributor"
+          scope: "/providers/Microsoft.Management/managementGroups/root-mg"
+          description: "Manage policy definitions and assignments"
+
+    - name: role
+      displayName: "Azure Operator - RBAC"
+      scope: management_group
+      managementGroupId: "root-mg"
+      cpuCores: 0.5
+      memoryGb: 1.0
+      roleAssignments:
+        - roleDefinitionName: "User Access Administrator"
+          scope: "/providers/Microsoft.Management/managementGroups/root-mg"
+          description: "Manage custom roles and RBAC assignments"

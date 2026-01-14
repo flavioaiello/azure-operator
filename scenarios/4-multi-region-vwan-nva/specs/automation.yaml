@@ -1,0 +1,36 @@
+# Automation Account Spec
+# Operator: automation
+
+apiVersion: alz.azure.com/v1alpha1
+kind: AutomationSpec
+
+metadata:
+  name: alz-automation
+
+spec:
+  location: westeurope
+  subscriptionId: ""  # CHANGE: Your management subscription ID
+  resourceGroupName: rg-alz-management
+
+  automationAccount:
+    name: aa-alz-management
+    sku: Basic
+    
+    # Link to Log Analytics workspace
+    linkedWorkspace:
+      name: log-alz-management
+      resourceGroup: rg-alz-management
+
+    # Managed identity for runbooks
+    identity:
+      type: SystemAssigned
+
+    # Update management (optional)
+    updateManagement:
+      enabled: true
+      schedules: []
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator

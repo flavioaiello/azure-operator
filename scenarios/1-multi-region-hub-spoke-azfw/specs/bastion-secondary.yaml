@@ -1,0 +1,45 @@
+# Azure Bastion Spec - Secondary Region
+# Operator: bastion
+
+apiVersion: alz.azure.com/v1alpha1
+kind: BastionSpec
+
+metadata:
+  name: bastion-northeurope
+
+spec:
+  location: northeurope  # Secondary region
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-connectivity-northeurope
+
+  bastion:
+    name: bas-hub-northeurope
+    sku: Standard
+    scaleUnits: 2
+    enableTunneling: true
+    enableShareableLink: false
+    enableIpConnect: false
+    enableFileCopy: true
+    enableKerberos: false
+
+    virtualNetwork:
+      name: vnet-hub-northeurope
+      resourceGroup: rg-alz-connectivity-northeurope
+      subnetName: AzureBastionSubnet
+
+  publicIpAddress:
+    name: pip-bas-hub-northeurope
+    sku: Standard
+    allocationMethod: Static
+    zones: ["1", "2", "3"]
+
+  diagnosticSettings:
+    logAnalyticsWorkspace:
+      name: log-alz-management
+      resourceGroup: rg-alz-management
+      subscriptionId: ""
+
+  tags:
+    environment: production
+    scenario: "1-multi-region-hub-spoke-azfw"
+    managedBy: azure-operator

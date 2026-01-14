@@ -1,0 +1,38 @@
+# Log Analytics Workspace Spec
+# Operator: log-analytics
+
+apiVersion: alz.azure.com/v1alpha1
+kind: LogAnalyticsSpec
+
+metadata:
+  name: alz-log-analytics
+
+spec:
+  location: westeurope
+  subscriptionId: ""  # CHANGE: Your management subscription ID
+  resourceGroupName: rg-alz-management
+
+  workspace:
+    name: log-alz-management
+    sku: PerGB2018
+    retentionDays: 365
+    dailyQuotaGb: -1  # No limit
+    
+    # Solutions to enable
+    solutions:
+      - name: SecurityInsights  # Microsoft Sentinel
+        enabled: false          # Enable in multi-region scenarios
+      - name: SecurityCenterFree
+        enabled: true
+      - name: VMInsights
+        enabled: true
+      - name: ContainerInsights
+        enabled: true
+
+    # Data export rules (optional)
+    dataExport: []
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator

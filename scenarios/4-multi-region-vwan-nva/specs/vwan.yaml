@@ -1,0 +1,44 @@
+# Virtual WAN Spec (NVA variant)
+# Operator: vwan
+
+apiVersion: alz.azure.com/v1alpha1
+kind: VirtualWanSpec
+
+metadata:
+  name: vwan-westeurope
+
+spec:
+  location: westeurope
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-connectivity-westeurope
+
+  virtualWan:
+    name: vwan-alz
+    type: Standard
+
+  # Virtual Hub
+  virtualHub:
+    name: vhub-westeurope
+    addressPrefix: "10.0.0.0/23"
+    hubRoutingPreference: ExpressRoute
+
+  # NO Azure Firewall - use NVA instead
+  azureFirewall:
+    enabled: false
+
+  # NVA in Virtual WAN
+  # Deploy via Azure Marketplace or partner solutions:
+  # - Palo Alto Networks
+  # - Fortinet FortiGate
+  # - Barracuda CloudGen WAN
+  # - Check Point CloudGuard
+  # - Cisco SD-WAN
+  networkVirtualAppliance:
+    enabled: true
+    # NVA is deployed separately via marketplace
+    # Configure routing to point to NVA IP
+
+  tags:
+    environment: production
+    scenario: "9-single-region-vwan-nva"
+    managedBy: azure-operator

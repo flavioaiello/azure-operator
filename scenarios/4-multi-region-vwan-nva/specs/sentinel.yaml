@@ -1,0 +1,66 @@
+# Microsoft Sentinel Spec
+# Operator: sentinel
+
+apiVersion: alz.azure.com/v1alpha1
+kind: SentinelSpec
+
+metadata:
+  name: alz-sentinel
+
+spec:
+  location: westeurope
+  subscriptionId: ""  # CHANGE: Your management subscription ID
+  resourceGroupName: rg-alz-management
+
+  # Log Analytics workspace for Sentinel
+  workspace:
+    name: log-alz-management
+    resourceGroup: rg-alz-management
+
+  # Data connectors to enable
+  dataConnectors:
+    - name: AzureActiveDirectory
+      enabled: true
+      tenantId: ""  # Your tenant ID
+    - name: AzureActivity
+      enabled: true
+    - name: MicrosoftDefenderAdvancedThreatProtection
+      enabled: true
+    - name: MicrosoftCloudAppSecurity
+      enabled: true
+    - name: Office365
+      enabled: true
+    - name: ThreatIntelligence
+      enabled: true
+    - name: AzureSecurityCenter
+      enabled: true
+
+  # Analytics rules (built-in)
+  analyticsRules:
+    enableMicrosoftIncidentCreation: true
+    enableFusionRules: true
+    enableMlBehaviorAnalytics: true
+    scheduledRules: []  # Custom scheduled rules
+
+  # Automation rules
+  automationRules: []
+
+  # Playbooks (Logic Apps)
+  playbooks: []
+
+  # Watchlists
+  watchlists: []
+
+  # Threat intelligence
+  threatIntelligence:
+    enabled: true
+    indicators: []
+
+  # Entity behavior (UEBA)
+  entityBehavior:
+    enabled: true
+
+  tags:
+    environment: production
+    scenario: "1-multi-region-hub-spoke-azfw"
+    managedBy: azure-operator

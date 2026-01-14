@@ -1,0 +1,112 @@
+# Azure Firewall Spec
+# Operator: firewall
+
+apiVersion: alz.azure.com/v1alpha1
+kind: FirewallSpec
+
+metadata:
+  name: firewall-westeurope
+
+spec:
+  location: westeurope
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-connectivity-westeurope
+
+  firewall:
+    name: afw-hub-westeurope
+    
+    # SKU: Standard or Premium
+    # Premium adds: TLS inspection, IDPS, URL filtering, Web categories
+    sku: Standard
+    
+    # Availability zones for HA
+    availabilityZones:
+      - "1"
+      - "2"
+      - "3"
+
+    # Threat intelligence mode: Alert, Deny, or Off
+    threatIntelMode: Alert
+    
+    # DNS settings
+    dnsSettings:
+      enableProxy: true
+      servers: []  # Empty = Azure DNS
+
+    # Link to hub VNet
+    virtualNetwork:
+      name: vnet-hub-westeurope
+      resourceGroup: rg-alz-connectivity-westeurope
+
+  # Firewall Policy (Azure Firewall Manager)
+  firewallPolicy:
+    name: afwp-hub-westeurope
+    sku: Standard  # Match firewall SKU
+    
+    # Base policy (optional - for hierarchical policies)
+    basePolicy: null
+    
+    # Threat intelligence allowlist
+    threatIntelWhitelist:
+      ipAddresses: []
+      fqdns: []
+
+    # Rule collection groups
+    ruleCollectionGroups:
+      - name: rcg-platform
+        priority: 100
+        ruleCollections:
+          - name: rc-allow-azure-services
+            priority: 100
+            action: Allow
+            ruleCollectionType: FirewallPolicyFilterRuleCollection
+            rules:
+              - name: allow-azure-monitor
+                ruleType: ApplicationRule
+                sourceAddresses: ["10.0.0.0/8"]
+                protocols:
+                  - protocolType: Https
+                    port: 443
+                targetFqdns:
+                  - "*.monitor.azure.com"
+                  - "*.ods.opinsights.azure.com"
+                  - "*.oms.opinsights.azure.com"
+              
+              - name: allow-azure-ad
+                ruleType: ApplicationRule
+                sourceAddresses: ["10.0.0.0/8"]
+                protocols:
+                  - protocolType: Https
+                    port: 443
+                targetFqdns:
+                  - "login.microsoftonline.com"
+                  - "graph.microsoft.com"
+                  - "*.aadcdn.microsoftonline-p.com"
+
+      - name: rcg-dnat
+        priority: 200
+        ruleCollections: []  # Add DNAT rules as needed
+
+  # Diagnostic settings
+  diagnosticSettings:
+    logAnalyticsWorkspace:
+      name: log-alz-management
+      resourceGroup: rg-alz-management
+      subscriptionId: ""  # Management subscription
+    logs:
+      - category: AzureFirewallApplicationRule
+        enabled: true
+      - category: AzureFirewallNetworkRule
+        enabled: true
+      - category: AzureFirewallDnsProxy
+        enabled: true
+      - category: AZFWThreatIntel
+        enabled: true
+    metrics:
+      - category: AllMetrics
+        enabled: true
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator

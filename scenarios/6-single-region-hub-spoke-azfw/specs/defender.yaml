@@ -1,0 +1,86 @@
+# Microsoft Defender for Cloud Spec
+# Operator: defender
+#
+# Defender configuration follows ALZ Security subscription pattern:
+# https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/landing-zone/design-area/security
+
+apiVersion: alz.azure.com/v1alpha1
+kind: DefenderSpec
+
+metadata:
+  name: alz-defender
+
+spec:
+  # Defender is configured at management group scope (inherited by all subscriptions)
+  managementGroupId: contoso  # CHANGE: Your root MG ID
+
+  # Security subscription (under Platform > Security management group)
+  # Hosts Microsoft Sentinel, syslog collectors, and SIEM tooling
+  securitySubscriptionId: ""  # CHANGE: Your Security subscription ID
+
+  # Auto-provisioning settings (applied tenant-wide)
+  autoProvisioning:
+    logAnalytics: "On"
+    vulnerabilityAssessment: "On"
+    agentlessScanning: "On"
+    containerVulnerabilityAssessment: "On"
+
+  # Defender plans to enable (ALZ recommended baseline)
+  enabledPlans:
+    # Compute protection
+    - name: VirtualMachines
+      pricingTier: Standard
+      subPlan: P2  # Includes agentless scanning
+    - name: Containers
+      pricingTier: Standard
+    - name: AppServices
+      pricingTier: Standard
+
+    # Data protection
+    - name: StorageAccounts
+      pricingTier: Standard
+      subPlan: DefenderForStorageV2
+    - name: SqlServers
+      pricingTier: Standard
+    - name: SqlServerVirtualMachines
+      pricingTier: Standard
+    - name: OpenSourceRelationalDatabases
+      pricingTier: Standard
+    - name: CosmosDbs
+      pricingTier: Standard
+
+    # Security posture
+    - name: KeyVaults
+      pricingTier: Standard
+    - name: Arm
+      pricingTier: Standard
+    - name: Dns
+      pricingTier: Standard
+
+    # DevOps security
+    - name: Api
+      pricingTier: Standard
+
+  # Security contacts (required for ALZ compliance)
+  securityContacts:
+    - email: security@contoso.com  # CHANGE: Your security team email
+      phone: ""
+      alertNotifications: "On"
+      alertsToAdmins: "On"
+      notificationsSeverity: High  # High, Medium, Low
+
+  # Continuous export to Log Analytics (in Management subscription)
+  continuousExport:
+    enabled: true
+    workspaceResourceId: ""  # CHANGE: Set to Log Analytics workspace ID
+    exportedDataTypes:
+      - SecurityAlerts
+      - SecurityRecommendations
+      - SecureScore
+      - RegulatoryCompliance
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator
+    alzVersion: "2024-07"

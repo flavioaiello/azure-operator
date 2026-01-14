@@ -1,0 +1,174 @@
+# Bicep Compilation Pipeline
+#
+# Compiles Bicep templates to ARM JSON and commits to the repository.
+# This enables git-sync to deliver templates to operators without container rebuilds.
+#
+# Flow:
+# 1. Bicep source changes in /bicep
+# 2. This workflow compiles to ARM JSON
+# 3. Commits compiled templates to /templates (tracked in git)
+# 4. Git-sync in ACI pulls changes
+# 5. Operators pick up new templates on next reconciliation cycle
+#
+# SECURITY: Only runs on main branch to prevent arbitrary code execution
+
+name: Compile Bicep Templates
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bicep/**'
+      - '.github/workflows/compile-bicep.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'bicep/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Required to commit compiled templates
+
+env:
+  BICEP_VERSION: 'latest'
+
+jobs:
+  compile:
+    name: Compile Bicep to ARM
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Need full history for commit
+          fetch-depth: 0
+
+      - name: Setup Azure CLI
+        uses: azure/setup-azurecli@v1
+
+      - name: Install Bicep CLI
+        run: |
+          az bicep install
+          az bicep version
+
+      - name: Compile Bicep templates
+        run: |
+          mkdir -p templates
+          
+          echo "🔨 Compiling Bicep templates to ARM JSON..."
+          
+          # Track compilation results
+          compiled=0
+          failed=0
+          
+          # Compile each domain template
+          for domain in connectivity management policy security identity; do
+            bicep_file="bicep/${domain}/main.bicep"
+            output_file="templates/${domain}.json"
+            
+            if [ -f "$bicep_file" ]; then
+              echo "  Compiling: $bicep_file"
+              
+              if az bicep build --file "$bicep_file" --outfile "$output_file" 2>&1; then
+                echo "    ✅ Success: $output_file"
+                compiled=$((compiled + 1))
+              else
+                echo "    ❌ Failed: $bicep_file"
+                failed=$((failed + 1))
+              fi
+            else
+              echo "  ⏭️  Skipped: $bicep_file (not found)"
+            fi
+          done
+          
+          echo ""
+          echo "📊 Compilation Summary:"
+          echo "  Compiled: $compiled"
+          echo "  Failed: $failed"
+          
+          # Fail if any compilation failed
+          if [ $failed -gt 0 ]; then
+            echo "❌ Some templates failed to compile"
+            exit 1
+          fi
+          
+          # List compiled templates
+          echo ""
+          echo "📁 Compiled templates:"
+          ls -la templates/
+
+      - name: Validate ARM templates
+        run: |
+          echo "🔍 Validating ARM template structure..."
+          
+          for template in templates/*.json; do
+            if [ -f "$template" ]; then
+              echo "  Validating: $template"
+              
+              # Check it's valid JSON
+              if ! jq empty "$template" 2>/dev/null; then
+                echo "    ❌ Invalid JSON: $template"
+                exit 1
+              fi
+              
+              # Check required ARM template fields
+              schema=$(jq -r '.["$schema"] // empty' "$template")
+              if [ -z "$schema" ]; then
+                echo "    ❌ Missing \$schema: $template"
+                exit 1
+              fi
+              
+              echo "    ✅ Valid"
+            fi
+          done
+          
+          echo "✅ All templates valid"
+
+      # Only commit on push to main (not PRs)
+      - name: Commit compiled templates
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if there are changes
+          if git diff --quiet templates/; then
+            echo "ℹ️  No changes to compiled templates"
+            exit 0
+          fi
+          
+          # Stage and commit
+          git add templates/
+          git commit -m "chore: compile Bicep templates to ARM JSON [skip ci]
+          
+          Compiled from bicep/ source at $(git rev-parse --short HEAD)
+          
+          Templates updated:
+          $(git diff --cached --name-only templates/ | sed 's/^/  - /')"
+          
+          git push
+
+      - name: Upload templates as artifact (PRs)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-templates
+          path: templates/
+          retention-days: 7
+
+      - name: Summary
+        run: |
+          echo "## 🔨 Bicep Compilation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Domain | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          for domain in connectivity management policy security identity; do
+            if [ -f "templates/${domain}.json" ]; then
+              size=$(ls -lh "templates/${domain}.json" | awk '{print $5}')
+              echo "| ${domain} | ✅ Compiled (${size}) |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| ${domain} | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done

@@ -1,0 +1,47 @@
+# Azure Firewall Spec - Secondary Region
+# Operator: firewall
+
+apiVersion: alz.azure.com/v1alpha1
+kind: FirewallSpec
+
+metadata:
+  name: firewall-northeurope
+
+spec:
+  location: northeurope  # Secondary region
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-connectivity-northeurope
+
+  firewall:
+    name: afw-hub-northeurope
+    sku: Standard
+    availabilityZones: ["1", "2", "3"]
+    threatIntelMode: Alert
+    
+    dnsSettings:
+      enableProxy: true
+      servers: []
+
+    virtualNetwork:
+      name: vnet-hub-northeurope
+      resourceGroup: rg-alz-connectivity-northeurope
+
+  firewallPolicy:
+    name: afwp-hub-northeurope
+    sku: Standard
+    
+    # Inherit from parent policy for consistency
+    basePolicy:
+      name: afwp-hub-westeurope
+      resourceGroup: rg-alz-connectivity-westeurope
+
+  diagnosticSettings:
+    logAnalyticsWorkspace:
+      name: log-alz-management
+      resourceGroup: rg-alz-management
+      subscriptionId: ""
+
+  tags:
+    environment: production
+    scenario: "1-multi-region-hub-spoke-azfw"
+    managedBy: azure-operator

@@ -1,0 +1,92 @@
+# Hub Virtual Network Spec
+# Operator: hub-network
+
+apiVersion: alz.azure.com/v1alpha1
+kind: HubNetworkSpec
+
+metadata:
+  name: hub-network-westeurope
+
+spec:
+  location: westeurope
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-connectivity-westeurope
+
+  hub:
+    name: vnet-hub-westeurope
+    addressSpace: "10.0.0.0/16"
+    
+    subnets:
+      # Azure Firewall (required for this scenario)
+      - name: AzureFirewallSubnet
+        addressPrefix: "10.0.0.0/24"
+        # No NSG allowed on this subnet
+        
+      # Azure Firewall Management (for forced tunneling)
+      - name: AzureFirewallManagementSubnet
+        addressPrefix: "10.0.1.0/24"
+        # No NSG allowed on this subnet
+        
+      # Gateway (for VPN/ExpressRoute - optional in single-region)
+      - name: GatewaySubnet
+        addressPrefix: "10.0.2.0/24"
+        # No NSG allowed on this subnet
+        
+      # Azure Bastion
+      - name: AzureBastionSubnet
+        addressPrefix: "10.0.3.0/24"
+        # NSG is auto-configured by Bastion
+        
+      # Management subnet (jump boxes, etc.)
+      - name: snet-management
+        addressPrefix: "10.0.10.0/24"
+        networkSecurityGroup:
+          rules:
+            - name: AllowBastionInbound
+              priority: 100
+              direction: Inbound
+              access: Allow
+              protocol: Tcp
+              sourceAddressPrefix: "10.0.3.0/24"
+              destinationPortRanges: ["22", "3389"]
+              destinationAddressPrefix: "*"
+            - name: DenyAllInbound
+              priority: 4096
+              direction: Inbound
+              access: Deny
+              protocol: "*"
+              sourceAddressPrefix: "*"
+              destinationPortRange: "*"
+              destinationAddressPrefix: "*"
+              
+      # Shared services (DNS, AD, etc.)
+      - name: snet-shared-services
+        addressPrefix: "10.0.20.0/24"
+        networkSecurityGroup:
+          rules:
+            - name: AllowDnsInbound
+              priority: 100
+              direction: Inbound
+              access: Allow
+              protocol: "*"
+              sourceAddressPrefix: "VirtualNetwork"
+              destinationPortRanges: ["53"]
+              destinationAddressPrefix: "*"
+            - name: DenyAllInbound
+              priority: 4096
+              direction: Inbound
+              access: Deny
+              protocol: "*"
+              sourceAddressPrefix: "*"
+              destinationPortRange: "*"
+              destinationAddressPrefix: "*"
+
+    # DDoS Protection (optional - has cost implications)
+    ddosProtection:
+      enabled: false
+      # planId: ""  # Reference existing DDoS plan
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator

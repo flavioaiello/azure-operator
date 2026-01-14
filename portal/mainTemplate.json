@@ -1,0 +1,459 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-08-01/managementGroupDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "name": "Azure Landing Zones Operator",
+    "description": "Deploys the azure-operator infrastructure for continuous ALZ reconciliation.",
+    "version": "1.0.0"
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure region for deployment."
+      }
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "defaultValue": "rg-azure-operator",
+      "metadata": {
+        "description": "Name of the resource group for operator infrastructure."
+      }
+    },
+    "bootstrapIdentityName": {
+      "type": "string",
+      "defaultValue": "uami-azure-operator-bootstrap",
+      "metadata": {
+        "description": "Name for the bootstrap User-Assigned Managed Identity."
+      }
+    },
+    "rbacScope": {
+      "type": "string",
+      "defaultValue": "subscription",
+      "allowedValues": ["subscription", "managementGroup"],
+      "metadata": {
+        "description": "Scope for bootstrap identity RBAC assignment."
+      }
+    },
+    "managementGroupId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Management Group ID if rbacScope is managementGroup."
+      }
+    },
+    "operatorTopology": {
+      "type": "string",
+      "defaultValue": "hubSpoke",
+      "allowedValues": ["hubSpoke", "vwan"],
+      "metadata": {
+        "description": "Network topology type."
+      }
+    },
+    "enabledOperators": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "List of operator names to deploy."
+      }
+    },
+    "gitRepoUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Git repository URL for specs."
+      }
+    },
+    "gitBranch": {
+      "type": "string",
+      "defaultValue": "main",
+      "metadata": {
+        "description": "Git branch to sync."
+      }
+    },
+    "gitSpecsPath": {
+      "type": "string",
+      "defaultValue": "specs/",
+      "metadata": {
+        "description": "Path to specs within repository."
+      }
+    },
+    "gitUsername": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Git username for private repos."
+      }
+    },
+    "gitToken": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Git PAT for private repos."
+      }
+    },
+    "gitSyncInterval": {
+      "type": "int",
+      "defaultValue": 60,
+      "minValue": 30,
+      "maxValue": 600,
+      "metadata": {
+        "description": "Git sync interval in seconds."
+      }
+    },
+    "reconcileInterval": {
+      "type": "int",
+      "defaultValue": 300,
+      "minValue": 60,
+      "maxValue": 3600,
+      "metadata": {
+        "description": "Reconciliation interval in seconds."
+      }
+    },
+    "dryRun": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable dry-run mode."
+      }
+    },
+    "containerImage": {
+      "type": "string",
+      "defaultValue": "ghcr.io/azure-operator/azure-operator:latest",
+      "metadata": {
+        "description": "Operator container image."
+      }
+    },
+    "createLogAnalytics": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Create a new Log Analytics workspace."
+      }
+    },
+    "existingLogAnalyticsId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Existing Log Analytics workspace resource ID."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "deployedBy": "azure-operator-wizard",
+        "environment": "production"
+      },
+      "metadata": {
+        "description": "Tags to apply to resources."
+      }
+    }
+  },
+  "variables": {
+    "subscriptionId": "[subscription().subscriptionId]",
+    "resourceGroupDeploymentName": "[concat('rg-deploy-', uniqueString(deployment().name))]",
+    "identityDeploymentName": "[concat('identity-deploy-', uniqueString(deployment().name))]",
+    "aciDeploymentName": "[concat('aci-deploy-', uniqueString(deployment().name))]",
+    "logAnalyticsName": "[concat('log-azure-operator-', uniqueString(parameters('resourceGroupName')))]",
+    "ownerRoleDefinitionId": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",
+    "filteredOperators": "[filter(parameters('enabledOperators'), lambda('op', not(empty(lambdaVariables('op')))))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[variables('resourceGroupDeploymentName')]",
+      "location": "[parameters('location')]",
+      "subscriptionId": "[variables('subscriptionId')]",
+      "properties": {
+        "mode": "Incremental",
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "resources": [
+            {
+              "type": "Microsoft.Resources/resourceGroups",
+              "apiVersion": "2022-09-01",
+              "name": "[parameters('resourceGroupName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[variables('identityDeploymentName')]",
+      "subscriptionId": "[variables('subscriptionId')]",
+      "resourceGroup": "[parameters('resourceGroupName')]",
+      "dependsOn": [
+        "[variables('resourceGroupDeploymentName')]"
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "resources": [
+            {
+              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "apiVersion": "2023-01-31",
+              "name": "[parameters('bootstrapIdentityName')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('purpose', 'bootstrap-operator'))]"
+            },
+            {
+              "condition": "[parameters('createLogAnalytics')]",
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2022-10-01",
+              "name": "[variables('logAnalyticsName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": 90
+              }
+            }
+          ],
+          "outputs": {
+            "identityResourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('bootstrapIdentityName'))]"
+            },
+            "identityPrincipalId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('bootstrapIdentityName'))).principalId]"
+            },
+            "identityClientId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('bootstrapIdentityName'))).clientId]"
+            },
+            "logAnalyticsId": {
+              "type": "string",
+              "value": "[if(parameters('createLogAnalytics'), resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName')), parameters('existingLogAnalyticsId'))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "name": "[guid(parameters('bootstrapIdentityName'), variables('ownerRoleDefinitionId'), subscription().id)]",
+      "dependsOn": [
+        "[variables('identityDeploymentName')]"
+      ],
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('ownerRoleDefinitionId'))]",
+        "principalId": "[reference(variables('identityDeploymentName')).outputs.identityPrincipalId.value]",
+        "principalType": "ServicePrincipal",
+        "description": "Bootstrap identity for azure-operator - Owner at subscription scope"
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[variables('aciDeploymentName')]",
+      "subscriptionId": "[variables('subscriptionId')]",
+      "resourceGroup": "[parameters('resourceGroupName')]",
+      "dependsOn": [
+        "[variables('identityDeploymentName')]",
+        "[guid(parameters('bootstrapIdentityName'), variables('ownerRoleDefinitionId'), subscription().id)]"
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "resources": [
+            {
+              "type": "Microsoft.ContainerInstance/containerGroups",
+              "apiVersion": "2023-05-01",
+              "name": "azure-operator-bootstrap",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                  "[reference(variables('identityDeploymentName')).outputs.identityResourceId.value]": {}
+                }
+              },
+              "properties": {
+                "osType": "Linux",
+                "restartPolicy": "Always",
+                "containers": [
+                  {
+                    "name": "operator",
+                    "properties": {
+                      "image": "[parameters('containerImage')]",
+                      "resources": {
+                        "requests": {
+                          "cpu": 0.5,
+                          "memoryInGB": 1
+                        },
+                        "limits": {
+                          "cpu": 1,
+                          "memoryInGB": 2
+                        }
+                      },
+                      "environmentVariables": [
+                        {
+                          "name": "DOMAIN",
+                          "value": "bootstrap"
+                        },
+                        {
+                          "name": "AZURE_SUBSCRIPTION_ID",
+                          "value": "[variables('subscriptionId')]"
+                        },
+                        {
+                          "name": "AZURE_LOCATION",
+                          "value": "[parameters('location')]"
+                        },
+                        {
+                          "name": "AZURE_CLIENT_ID",
+                          "value": "[reference(variables('identityDeploymentName')).outputs.identityClientId.value]"
+                        },
+                        {
+                          "name": "RECONCILE_INTERVAL",
+                          "value": "[string(parameters('reconcileInterval'))]"
+                        },
+                        {
+                          "name": "DRY_RUN",
+                          "value": "[if(parameters('dryRun'), 'true', 'false')]"
+                        },
+                        {
+                          "name": "SPECS_DIR",
+                          "value": "/specs"
+                        },
+                        {
+                          "name": "TEMPLATES_DIR",
+                          "value": "/templates"
+                        }
+                      ],
+                      "volumeMounts": [
+                        {
+                          "name": "specs",
+                          "mountPath": "/specs",
+                          "readOnly": true
+                        },
+                        {
+                          "name": "templates",
+                          "mountPath": "/templates",
+                          "readOnly": true
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "name": "git-sync",
+                    "properties": {
+                      "image": "registry.k8s.io/git-sync/git-sync:v4.2.1",
+                      "resources": {
+                        "requests": {
+                          "cpu": 0.1,
+                          "memoryInGB": 0.25
+                        },
+                        "limits": {
+                          "cpu": 0.25,
+                          "memoryInGB": 0.5
+                        }
+                      },
+                      "environmentVariables": [
+                        {
+                          "name": "GITSYNC_REPO",
+                          "value": "[parameters('gitRepoUrl')]"
+                        },
+                        {
+                          "name": "GITSYNC_REF",
+                          "value": "[parameters('gitBranch')]"
+                        },
+                        {
+                          "name": "GITSYNC_ROOT",
+                          "value": "/git"
+                        },
+                        {
+                          "name": "GITSYNC_LINK",
+                          "value": "current"
+                        },
+                        {
+                          "name": "GITSYNC_PERIOD",
+                          "value": "[concat(string(parameters('gitSyncInterval')), 's')]"
+                        },
+                        {
+                          "name": "GITSYNC_ONE_TIME",
+                          "value": "false"
+                        }
+                      ],
+                      "volumeMounts": [
+                        {
+                          "name": "specs",
+                          "mountPath": "/git"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "specs",
+                    "emptyDir": {}
+                  },
+                  {
+                    "name": "templates",
+                    "emptyDir": {}
+                  }
+                ],
+                "diagnostics": {
+                  "logAnalytics": {
+                    "workspaceId": "[if(parameters('createLogAnalytics'), reference(resourceId(variables('subscriptionId'), parameters('resourceGroupName'), 'Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName')), '2022-10-01').customerId, '')]",
+                    "workspaceKey": "[if(parameters('createLogAnalytics'), listKeys(resourceId(variables('subscriptionId'), parameters('resourceGroupName'), 'Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName')), '2022-10-01').primarySharedKey, '')]",
+                    "logType": "ContainerInsights"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "resourceGroupName": {
+      "type": "string",
+      "value": "[parameters('resourceGroupName')]"
+    },
+    "bootstrapIdentityResourceId": {
+      "type": "string",
+      "value": "[reference(variables('identityDeploymentName')).outputs.identityResourceId.value]"
+    },
+    "bootstrapIdentityClientId": {
+      "type": "string",
+      "value": "[reference(variables('identityDeploymentName')).outputs.identityClientId.value]"
+    },
+    "containerGroupName": {
+      "type": "string",
+      "value": "azure-operator-bootstrap"
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "value": "[reference(variables('identityDeploymentName')).outputs.logAnalyticsId.value]"
+    },
+    "enabledOperators": {
+      "type": "array",
+      "value": "[variables('filteredOperators')]"
+    },
+    "deploymentInfo": {
+      "type": "object",
+      "value": {
+        "gitRepository": "[parameters('gitRepoUrl')]",
+        "gitBranch": "[parameters('gitBranch')]",
+        "specsPath": "[parameters('gitSpecsPath')]",
+        "reconcileIntervalSeconds": "[parameters('reconcileInterval')]",
+        "dryRunEnabled": "[parameters('dryRun')]"
+      }
+    }
+  }
+}

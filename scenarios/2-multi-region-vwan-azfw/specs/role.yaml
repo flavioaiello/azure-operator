@@ -1,0 +1,62 @@
+# Custom Roles & RBAC Spec
+# Operator: role
+
+apiVersion: alz.azure.com/v1alpha1
+kind: RoleSpec
+
+metadata:
+  name: alz-roles
+
+spec:
+  # Scope for role definitions
+  managementGroupId: contoso  # CHANGE: Your root MG ID
+
+  # Custom role definitions
+  customRoles:
+    - name: Application-Owners
+      description: Role for application teams to manage their resources
+      permissions:
+        actions:
+          - "Microsoft.Resources/subscriptions/resourceGroups/read"
+          - "Microsoft.Resources/deployments/*"
+          - "Microsoft.Insights/alertRules/*"
+          - "Microsoft.Support/*"
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      assignableScopes:
+        - /providers/Microsoft.Management/managementGroups/landingzones
+
+    - name: Network-Management
+      description: Role for network team to manage connectivity
+      permissions:
+        actions:
+          - "Microsoft.Network/*"
+          - "Microsoft.Resources/subscriptions/resourceGroups/read"
+          - "Microsoft.Resources/deployments/*"
+        notActions:
+          - "Microsoft.Network/expressRouteCircuits/delete"
+          - "Microsoft.Network/vpnGateways/delete"
+        dataActions: []
+        notDataActions: []
+      assignableScopes:
+        - /providers/Microsoft.Management/managementGroups/connectivity
+
+    - name: Security-Operations
+      description: Role for SecOps team
+      permissions:
+        actions:
+          - "Microsoft.Security/*"
+          - "Microsoft.Insights/alertRules/*"
+          - "Microsoft.OperationalInsights/workspaces/*/read"
+          - "Microsoft.Resources/subscriptions/resourceGroups/read"
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      assignableScopes:
+        - /providers/Microsoft.Management/managementGroups/contoso
+
+  tags:
+    environment: production
+    scenario: "6-single-region-hub-spoke-azfw"
+    managedBy: azure-operator

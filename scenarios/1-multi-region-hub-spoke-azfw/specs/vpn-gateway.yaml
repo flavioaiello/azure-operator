@@ -1,0 +1,65 @@
+# VPN Gateway Spec - Primary Region
+# Operator: vpn-gateway
+
+apiVersion: alz.azure.com/v1alpha1
+kind: VpnGatewaySpec
+
+metadata:
+  name: vpn-gateway-westeurope
+
+spec:
+  location: westeurope
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-connectivity-westeurope
+
+  vpnGateway:
+    name: vpngw-hub-westeurope
+    
+    # SKU (zone-redundant recommended)
+    sku: VpnGw2AZ  # VpnGw1AZ, VpnGw2AZ, VpnGw3AZ, VpnGw4AZ, VpnGw5AZ
+    
+    # Gateway type
+    gatewayType: Vpn  # Vpn or ExpressRoute
+    vpnType: RouteBased  # RouteBased or PolicyBased
+    
+    # Generation
+    vpnGatewayGeneration: Generation2
+    
+    # Active-Active mode (recommended for HA)
+    activeActive: true
+    
+    # BGP settings (for multi-region and hybrid)
+    enableBgp: true
+    bgpSettings:
+      asn: 65515
+      peerWeight: 0
+
+    # Virtual network
+    virtualNetwork:
+      name: vnet-hub-westeurope
+      resourceGroup: rg-alz-connectivity-westeurope
+
+  # Public IPs for gateway
+  publicIpAddresses:
+    - name: pip-vpngw-hub-westeurope-1
+      sku: Standard
+      allocationMethod: Static
+      zones: ["1", "2", "3"]
+    - name: pip-vpngw-hub-westeurope-2
+      sku: Standard
+      allocationMethod: Static
+      zones: ["1", "2", "3"]
+
+  # VPN connections (site-to-site)
+  connections: []
+
+  diagnosticSettings:
+    logAnalyticsWorkspace:
+      name: log-alz-management
+      resourceGroup: rg-alz-management
+      subscriptionId: ""
+
+  tags:
+    environment: production
+    scenario: "1-multi-region-hub-spoke-azfw"
+    managedBy: azure-operator

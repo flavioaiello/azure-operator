@@ -1,0 +1,71 @@
+# Virtual WAN Spec
+# Operator: vwan (or connectivity)
+
+apiVersion: alz.azure.com/v1alpha1
+kind: VirtualWanSpec
+
+metadata:
+  name: vwan-westeurope
+
+spec:
+  location: westeurope
+  subscriptionId: ""  # CHANGE: Your connectivity subscription ID
+  resourceGroupName: rg-alz-connectivity-westeurope
+
+  virtualWan:
+    name: vwan-alz
+    type: Standard  # Basic or Standard
+
+  # Virtual Hub
+  virtualHub:
+    name: vhub-westeurope
+    addressPrefix: "10.0.0.0/23"
+    
+    # Hub routing preference
+    hubRoutingPreference: ExpressRoute  # ExpressRoute, VpnGateway, or ASPath
+    
+    # Virtual Hub routing intent (for secured hub)
+    routingIntent:
+      enabled: true
+      routingPolicies:
+        - name: InternetTraffic
+          destinations: ["Internet"]
+          nextHop: azureFirewall
+        - name: PrivateTraffic
+          destinations: ["PrivateTraffic"]
+          nextHop: azureFirewall
+
+  # Azure Firewall in Virtual Hub (Secured Hub)
+  azureFirewall:
+    enabled: true  # This makes it a "Secured Virtual Hub"
+    name: afw-vhub-westeurope
+    sku: Standard  # Standard or Premium
+    threatIntelMode: Alert
+    
+    firewallPolicy:
+      name: afwp-vhub-westeurope
+      sku: Standard
+
+  # VPN Gateway in Virtual Hub (optional)
+  vpnGateway:
+    enabled: false
+    # name: vpngw-vhub-westeurope
+    # scaleUnit: 1
+
+  # ExpressRoute Gateway in Virtual Hub (optional)
+  expressRouteGateway:
+    enabled: false
+    # name: ergw-vhub-westeurope
+    # scaleUnit: 1
+
+  # Diagnostic settings
+  diagnosticSettings:
+    logAnalyticsWorkspace:
+      name: log-alz-management
+      resourceGroup: rg-alz-management
+      subscriptionId: ""  # Management subscription
+
+  tags:
+    environment: production
+    scenario: "7-single-region-vwan-azfw"
+    managedBy: azure-operator
