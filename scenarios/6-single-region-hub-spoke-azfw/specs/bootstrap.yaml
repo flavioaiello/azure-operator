@@ -161,17 +161,6 @@ spec:
           scope: "/providers/Microsoft.Management/managementGroups/root-mg"
           description: "Manage management group hierarchy"
 
-    - name: policy-operator
-      displayName: "Azure Operator - Policy"
-      scope: management_group
-      managementGroupId: "root-mg"
-      cpuCores: 0.5
-      memoryGb: 1.0
-      roleAssignments:
-        - roleDefinitionName: "Resource Policy Contributor"
-          scope: "/providers/Microsoft.Management/managementGroups/root-mg"
-          description: "Manage policy definitions and assignments"
-
     - name: role
       displayName: "Azure Operator - RBAC"
       scope: management_group

@@ -1,13 +1,14 @@
-# Scenario 5: Management Groups, Policy and Management Resources Only
+# Scenario 5: Management Groups and Management Resources Only
 
 Use this when you already have network connectivity or are migrating from another implementation.
+
+> **Policy Management:** Use [Enterprise Policy as Code (EPAC)](https://aka.ms/epac) for Azure Policy.
 
 ## What's Deployed
 
 | Operator | Resources |
 |----------|-----------|
 | management-group | ALZ management group hierarchy |
-| policy | Azure Policy definitions & assignments |
 | role | Custom roles & RBAC |
 | log-analytics | Log Analytics workspace |
 | automation | Automation account |

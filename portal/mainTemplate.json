@@ -135,11 +135,6 @@
       "defaultValue": false,
       "metadata": { "description": "Enable Key Vault operator." }
     },
-    "enablePolicy": {
-      "type": "bool",
-      "defaultValue": false,
-      "metadata": { "description": "Enable Policy operator." }
-    },
     "enableManagementGroups": {
       "type": "bool",
       "defaultValue": false,
@@ -243,7 +238,7 @@
     "aciDeploymentName": "[concat('aci-deploy-', uniqueString(deployment().name))]",
     "logAnalyticsName": "[concat('log-azure-operator-', uniqueString(parameters('resourceGroupName')))]",
     "ownerRoleDefinitionId": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",
-    "enabledOperatorsRaw": "[createArray(if(parameters('enableFirewall'), 'firewall', ''), if(parameters('enableBastion'), 'bastion', ''), if(parameters('enableVpnGateway'), 'vpn-gateway', ''), if(parameters('enableExpressRoute'), 'expressroute', ''), if(parameters('enableDns'), 'dns', ''), if(parameters('enableHubNetwork'), 'hub-network', ''), if(parameters('enableVwan'), 'vwan', ''), if(parameters('enableVwanHub'), 'vwan-hub', ''), if(parameters('enableVwanFirewall'), 'vwan-firewall', ''), if(parameters('enableVwanVpn'), 'vwan-vpn-gateway', ''), if(parameters('enableVwanExpressRoute'), 'vwan-expressroute', ''), if(parameters('enableLogAnalytics'), 'log-analytics', ''), if(parameters('enableAutomation'), 'automation', ''), if(parameters('enableMonitor'), 'monitor', ''), if(parameters('enableDefender'), 'defender', ''), if(parameters('enableSentinel'), 'sentinel', ''), if(parameters('enableKeyVault'), 'keyvault', ''), if(parameters('enablePolicy'), 'policy-operator', ''), if(parameters('enableManagementGroups'), 'management-group', ''))]",
+    "enabledOperatorsRaw": "[createArray(if(parameters('enableFirewall'), 'firewall', ''), if(parameters('enableBastion'), 'bastion', ''), if(parameters('enableVpnGateway'), 'vpn-gateway', ''), if(parameters('enableExpressRoute'), 'expressroute', ''), if(parameters('enableDns'), 'dns', ''), if(parameters('enableHubNetwork'), 'hub-network', ''), if(parameters('enableVwan'), 'vwan', ''), if(parameters('enableVwanHub'), 'vwan-hub', ''), if(parameters('enableVwanFirewall'), 'vwan-firewall', ''), if(parameters('enableVwanVpn'), 'vwan-vpn-gateway', ''), if(parameters('enableVwanExpressRoute'), 'vwan-expressroute', ''), if(parameters('enableLogAnalytics'), 'log-analytics', ''), if(parameters('enableAutomation'), 'automation', ''), if(parameters('enableMonitor'), 'monitor', ''), if(parameters('enableDefender'), 'defender', ''), if(parameters('enableSentinel'), 'sentinel', ''), if(parameters('enableKeyVault'), 'keyvault', ''), if(parameters('enableManagementGroups'), 'management-group', ''))]",
     "filteredOperators": "[filter(variables('enabledOperatorsRaw'), lambda('op', not(empty(lambdaVariables('op')))))]"
   },
   "resources": [

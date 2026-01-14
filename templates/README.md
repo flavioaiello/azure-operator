@@ -17,9 +17,8 @@ To modify templates:
 |----------|--------|---------|
 | `connectivity.json` | `bicep/connectivity/main.bicep` | firewall, bastion, dns, hub-network, vpn-gateway, expressroute, vwan-* |
 | `management.json` | `bicep/management/main.bicep` | log-analytics, automation, monitor |
-| `policy.json` | `bicep/policy/main.bicep` | policy, policy-operator, management-group |
 | `security.json` | `bicep/security/main.bicep` | defender, keyvault, sentinel |
-| `identity.json` | `bicep/identity/main.bicep` | role, bootstrap |
+| `identity.json` | `bicep/identity/main.bicep` | role, management-group, bootstrap |
 
 ## How It Works
 

@@ -307,96 +307,6 @@ class ManagementGroupConfig(BaseModel):
     parent_id: str = Field(alias="parentId")
 
 
-class CustomPolicyConfig(BaseModel):
-    """Custom policy definition configuration."""
-
-    model_config = {"extra": "ignore"}
-
-    name: Annotated[str, Field(min_length=1)]
-    display_name: str = Field(alias="displayName")
-    description: str | None = None
-    mode: str = "All"
-    policy_rule: dict[str, Any] = Field(alias="policyRule")
-
-
-class PolicyAssignmentConfig(BaseModel):
-    """Policy assignment configuration."""
-
-    model_config = {"extra": "ignore"}
-
-    name: Annotated[str, Field(min_length=1)]
-    policy_definition_id: str = Field(alias="policyDefinitionId")
-    scope: str
-    parameters: dict[str, Any] = Field(default_factory=dict)
-    enforcement_mode: str = Field("Default", alias="enforcementMode")
-    non_compliance_message: str | None = Field(None, alias="nonComplianceMessage")
-
-
-class PolicySpec(BaseSpec):
-    """Policy domain specification."""
-
-    root_management_group_name: str = Field(alias="managementGroupId")
-    management_groups: list[ManagementGroupConfig] = Field(
-        default_factory=list, alias="managementGroups"
-    )
-    custom_policies: list[CustomPolicyConfig] = Field(default_factory=list, alias="customPolicies")
-    policy_assignments: list[PolicyAssignmentConfig] = Field(
-        default_factory=list, alias="policyAssignments"
-    )
-
-    def to_arm_parameters(self) -> dict[str, Any]:
-        """Convert to ARM template parameters."""
-        params: dict[str, Any] = {}
-
-        params["rootManagementGroupName"] = {"value": self.root_management_group_name}
-
-        if self.management_groups:
-            params["managementGroups"] = {
-                "value": [
-                    {
-                        "name": mg.name,
-                        "displayName": mg.display_name,
-                        "parentId": mg.parent_id,
-                    }
-                    for mg in self.management_groups
-                ]
-            }
-
-        if self.custom_policies:
-            params["customPolicies"] = {
-                "value": [
-                    {
-                        "name": p.name,
-                        "displayName": p.display_name,
-                        "description": p.description,
-                        "mode": p.mode,
-                        "policyRule": p.policy_rule,
-                    }
-                    for p in self.custom_policies
-                ]
-            }
-
-        if self.policy_assignments:
-            params["policyAssignments"] = {
-                "value": [
-                    {
-                        "name": a.name,
-                        "policyDefinitionId": a.policy_definition_id,
-                        "scope": a.scope,
-                        "parameters": a.parameters,
-                        "enforcementMode": a.enforcement_mode,
-                        "nonComplianceMessage": a.non_compliance_message,
-                    }
-                    for a in self.policy_assignments
-                ]
-            }
-
-        if self.tags:
-            params["tags"] = {"value": self.tags}
-
-        return params
-
-
 # =============================================================================
 # Security Domain
 # =============================================================================
@@ -1179,45 +1089,6 @@ class ManagementGroupSpec(BaseSpec):
         return params
 
 
-class PolicyOperatorSpec(BaseSpec):
-    """Policy operator specification."""
-
-    custom_policies: list[CustomPolicyConfig] = Field(default_factory=list, alias="customPolicies")
-    policy_assignments: list[PolicyAssignmentConfig] = Field(
-        default_factory=list, alias="policyAssignments"
-    )
-
-    def to_arm_parameters(self) -> dict[str, Any]:
-        params: dict[str, Any] = {}
-        if self.custom_policies:
-            params["customPolicies"] = {
-                "value": [
-                    {
-                        "name": p.name,
-                        "displayName": p.display_name,
-                        "description": p.description,
-                        "mode": p.mode,
-                        "policyRule": p.policy_rule,
-                    }
-                    for p in self.custom_policies
-                ]
-            }
-        if self.policy_assignments:
-            params["policyAssignments"] = {
-                "value": [
-                    {
-                        "name": a.name,
-                        "policyDefinitionId": a.policy_definition_id,
-                        "scope": a.scope,
-                        "parameters": a.parameters,
-                        "enforcementMode": a.enforcement_mode,
-                    }
-                    for a in self.policy_assignments
-                ]
-            }
-        return params
-
-
 class RoleSpec(BaseSpec):
     """Role operator specification (RBAC)."""
 
@@ -1413,8 +1284,6 @@ SPEC_REGISTRY: dict[str, type[BaseSpec]] = {
     "sentinel": SentinelSpec,
     # Granular governance operators
     "management-group": ManagementGroupSpec,
-    "policy-operator": PolicyOperatorSpec,
-    "policy": PolicySpec,
     "role": RoleSpec,
     # Secondary region specs (reuse primary spec classes)
     # Multi-region scenarios use -secondary suffix for second region

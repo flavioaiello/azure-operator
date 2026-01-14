@@ -50,7 +50,7 @@ The wizard deploys the operator infrastructure:
 - Connectivity operators (Firewall, Bastion, VPN, etc.)
 - Management operators (Log Analytics, Monitor)
 - Security operators (Defender, Sentinel, Key Vault)
-- Governance operators (Policy, Management Groups)
+- Governance operators (Roles, Management Groups)
 
 ### 4. Git Configuration
 - Repository URL

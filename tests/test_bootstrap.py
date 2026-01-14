@@ -117,7 +117,7 @@ class TestOperatorIdentityConfig:
         """Test valid management-group-scoped operator."""
         config = OperatorIdentityConfig.model_validate(
             {
-                "name": "policy-operator",
+                "name": "management-group",
                 "scope": "management_group",
                 "managementGroupId": "root-mg",
             }

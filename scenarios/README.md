@@ -61,12 +61,13 @@ az deployment sub create \
 | Operator | Purpose |
 |----------|---------|
 | management-group | ALZ management group hierarchy |
-| policy | Azure Policy definitions & assignments |
 | role | Custom roles & RBAC |
 | log-analytics | Log Analytics workspace |
 | automation | Automation account |
 | monitor | Data collection rules, alerts |
 | defender | Microsoft Defender for Cloud |
+
+> **Policy Management:** Use [Enterprise Policy as Code (EPAC)](https://aka.ms/epac) for Azure Policy.
 
 ### Connectivity Operators (varies by scenario)
 
@@ -106,7 +107,6 @@ scenarios/
 │   ├── README.md
 │   └── specs/
 │       ├── management-group.yaml
-│       ├── policy.yaml
 │       ├── hub-network.yaml
 │       ├── hub-network-secondary.yaml   # Secondary region
 │       ├── firewall.yaml
@@ -119,7 +119,6 @@ scenarios/
 │   ├── README.md
 │   └── specs/
 │       ├── management-group.yaml
-│       ├── policy.yaml
 │       ├── hub-network.yaml
 │       ├── firewall.yaml
 │       ├── bastion.yaml

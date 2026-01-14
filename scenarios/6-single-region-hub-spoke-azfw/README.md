@@ -2,12 +2,13 @@
 
 The most common starting topology for organizations new to Azure.
 
+> **Policy Management:** Use [Enterprise Policy as Code (EPAC)](https://aka.ms/epac) for Azure Policy.
+
 ## What's Deployed
 
 | Operator | Resources |
 |----------|-----------|
 | management-group | ALZ management group hierarchy |
-| policy | Azure Policy definitions & assignments |
 | role | Custom roles & RBAC |
 | log-analytics | Log Analytics workspace |
 | automation | Automation account |

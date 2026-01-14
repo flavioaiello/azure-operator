@@ -54,8 +54,6 @@ regexes = [
 ]
 
 paths = [
-    # Policy definitions are public Microsoft content synced from ALZ
-    '''lib/policies/.*\.json''',
     # Lock files contain package hashes, not secrets
     '''requirements.*\.lock\.txt''',
 ]

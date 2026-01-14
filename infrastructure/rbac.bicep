@@ -31,7 +31,6 @@ param operatorPrincipalIds object = {
   sentinel: ''
   // Governance operators
   managementGroup: ''
-  policy: ''
   role: ''
 }
 
@@ -246,17 +245,6 @@ resource mgOperatorMgContributor 'Microsoft.Authorization/roleAssignments@2022-0
   }
 }
 
-// Policy Operator - Resource Policy Contributor only (NOT MG Contributor)
-resource policyOperatorRbac 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(operatorPrincipalIds.policy)) {
-  name: guid(rootManagementGroupId, operatorPrincipalIds.policy, resourcePolicyContributorRoleId)
-  properties: {
-    principalId: operatorPrincipalIds.policy
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', resourcePolicyContributorRoleId)
-    principalType: 'ServicePrincipal'
-    description: 'Policy operator - Resource Policy Contributor for policy management'
-  }
-}
-
 // Role Operator - User Access Administrator + Reader
 resource roleOperatorUaa 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(operatorPrincipalIds.role)) {
   name: guid(rootManagementGroupId, operatorPrincipalIds.role, userAccessAdministratorRoleId)
@@ -287,3 +275,4 @@ output rbacAssigned bool = true
 
 @description('Number of operators with RBAC configured.')
 output operatorCount int = 15
+4

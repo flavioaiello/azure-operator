@@ -459,8 +459,8 @@ class TestALZManagementGroupScope:
                 ],
             }
 
-            # management-group operator maps to 'policy' domain template
-            (templates_dir / "policy.json").write_text(
+            # management-group operator maps to 'identity' domain template
+            (templates_dir / "identity.json").write_text(
                 __import__("json").dumps(template, indent=2)
             )
             yield templates_dir
@@ -586,100 +586,3 @@ class TestALZManagementGroupScope:
             # No deployment when no drift
             if not result.drift_found:
                 assert ctx.get_deployment_count() == 0
-
-
-class TestALZPolicyScope:
-    """Integration tests for ALZ policy assignments at management group scope."""
-
-    @pytest.fixture
-    def policy_templates(self) -> Path:
-        """Create templates for policy-operator."""
-        with TemporaryDirectory() as tmpdir:
-            templates_dir = Path(tmpdir) / "templates"
-            templates_dir.mkdir()
-
-            # Policy assignment template at management group scope
-            template = {
-                "$schema": "https://schema.management.azure.com/schemas/2019-08-01/managementGroupDeploymentTemplate.json#",
-                "contentVersion": "1.0.0.0",
-                "parameters": {
-                    "policyAssignmentName": {"type": "string"},
-                    "policyDefinitionId": {"type": "string"},
-                    "enforcementMode": {"type": "string", "defaultValue": "Default"},
-                },
-                "resources": [
-                    {
-                        "type": "Microsoft.Authorization/policyAssignments",
-                        "apiVersion": "2022-06-01",
-                        "name": "[parameters('policyAssignmentName')]",
-                        "properties": {
-                            "policyDefinitionId": "[parameters('policyDefinitionId')]",
-                            "enforcementMode": "[parameters('enforcementMode')]",
-                        },
-                    }
-                ],
-            }
-
-            # policy-operator maps to 'policy' domain template
-            (templates_dir / "policy.json").write_text(
-                __import__("json").dumps(template, indent=2)
-            )
-            yield templates_dir
-
-    @pytest.fixture
-    def policy_specs(self) -> Path:
-        """Create specs for policy-operator."""
-        with TemporaryDirectory() as tmpdir:
-            specs_dir = Path(tmpdir) / "specs"
-            specs_dir.mkdir()
-
-            # ALZ-style policy spec
-            spec = {
-                "apiVersion": "alz.azure.com/v1alpha1",
-                "kind": "PolicyOperatorSpec",
-                "metadata": {"name": "alz-policy"},
-                "spec": {
-                    "managementGroupId": "contoso",
-                    "policyAssignmentName": "Deploy-MDFC-Config",
-                    "policyDefinitionId": (
-                        "/providers/Microsoft.Authorization/policySetDefinitions/"
-                        "1f3afdf9-d0c9-4c3d-847f-89da613e70a8"
-                    ),
-                    "enforcementMode": "Default",
-                },
-            }
-
-            spec_file = specs_dir / "policy-operator.yaml"
-            spec_file.write_text(yaml.dump(spec))
-            yield specs_dir
-
-    @pytest.fixture
-    def policy_config(self, policy_templates: Path, policy_specs: Path) -> Config:
-        """Create a policy-operator scoped configuration."""
-        return Config(
-            domain="policy-operator",
-            subscription_id="00000000-0000-0000-0000-000000000001",
-            location="westeurope",
-            templates_dir=policy_templates,
-            specs_dir=policy_specs,
-            scope=DeploymentScope.MANAGEMENT_GROUP,
-            management_group_id="contoso",
-            dry_run=False,
-            reconcile_interval_seconds=60,
-        )
-
-    @pytest.mark.asyncio
-    async def test_policy_deployment_at_mg_scope(
-        self, policy_config: Config, policy_templates: Path, policy_specs: Path
-    ) -> None:
-        """Test policy deployment at management group scope."""
-        _ = policy_templates, policy_specs  # Used to trigger fixture setup
-        with MockAzureContext() as ctx:
-            reconciler = Reconciler(policy_config)
-            result = await reconciler._reconcile_once()
-
-            # Should deploy policy assignment
-            assert result.drift_found is True
-            assert result.error is None
-            assert ctx.get_deployment_count() >= 1
-

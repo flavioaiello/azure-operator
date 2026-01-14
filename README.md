@@ -14,7 +14,6 @@ A **Python-based, stateless operator framework** for continuously reconciling Az
 [![Pydantic v2](https://img.shields.io/badge/pydantic-v2-E92063.svg)](https://docs.pydantic.dev/)
 [![Azure SDK](https://img.shields.io/badge/Azure%20SDK-Latest-0078D4.svg)](https://github.com/Azure/azure-sdk-for-python)
 [![Security: Secretless](https://img.shields.io/badge/security-secretless-brightgreen.svg)](#secretless-architecture-mandatory)
-[![ALZ Policies](https://img.shields.io/badge/ALZ%20Policies-170%2B-purple.svg)](#alz-policy-library)
 [![Tests: 67 passing](https://img.shields.io/badge/tests-67%20passing-brightgreen.svg)](tests/)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-flavioaiello%2Fazure--operator-blue.svg?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNNCAxOWg0djJINHoiLz48cGF0aCBkPSJNMTAgMTloNHYyaC00eiIvPjxwYXRoIGQ9Ik0xNiAxOWg0djJoLTR6Ii8+PHBhdGggZD0iTTQgMTFoMTZ2Mkg0eiIvPjxwYXRoIGQ9Ik00IDNoMTZ2Mkg0eiIvPjxwYXRoIGQ9Ik04IDN2MTYiLz48cGF0aCBkPSJNMTYgM3YxNiIvPjwvc3ZnPg==)](https://deepwiki.com/flavioaiello/azure-operator)
 
@@ -46,7 +45,7 @@ The **Azure Operator Framework** solves these by:
 >
 > **How:** YAML specs → ARM WhatIf (drift detection) → ARM deployment (apply). No Terraform state files.
 >
-> **Policies:** 170+ ALZ policy definitions & 49 initiatives synced from [Azure/Enterprise-Scale](https://github.com/Azure/Enterprise-Scale).
+> **Policy:** Use [Enterprise Policy as Code (EPAC)](https://aka.ms/epac) for policy management — Microsoft's battle-tested solution.
 >
 > **Security:** Secretless architecture — Managed Identities only, zero stored credentials.
 >
@@ -116,7 +115,7 @@ The **Azure Operator Framework** solves these by:
 │  │                   MANAGEMENT GROUP HIERARCHY                 │            │
 │  │                                                              │            │
 │  │               ┌─────────┐                                    │            │
-│  │               │  Root   │ ◄── Policy & Identity Operators    │            │
+│  │               │  Root   │ ◄── Identity Operators              │            │
 │  │               └────┬────┘                                    │            │
 │  │          ┌─────────┼─────────┐                               │            │
 │  │     ┌────▼───┐ ┌───▼────┐ ┌──▼───┐                          │            │
@@ -162,7 +161,6 @@ Each operator manages a **single concern** with its own:
 | | `keyvault` | Subscription | Key Vaults | Key Vault Administrator |
 | | `sentinel` | Subscription | Microsoft Sentinel | Log Analytics + Security Admin |
 | **Governance** | `management-group` | Management Group | MG hierarchy | MG Contributor |
-| | `policy` | Management Group | 170+ policy definitions, 49 initiatives, assignments | Resource Policy Contributor |
 | | `role` | Management Group | Custom roles, RBAC | User Access Administrator |
 
 **Multi-Region Support:** Secondary region operators (`-secondary` suffix) reuse primary spec classes:
@@ -171,96 +169,34 @@ Each operator manages a **single concern** with its own:
 
 ---
 
-## ALZ Policy Library
+## Policy Management
 
-The operator includes the complete **Azure Landing Zone policy library** synced from [Azure/Enterprise-Scale](https://github.com/Azure/Enterprise-Scale).
+For Azure Policy management, we recommend [**Enterprise Policy as Code (EPAC)**](https://aka.ms/epac) — Microsoft's mature, battle-tested solution for policy-as-code.
 
-### What's Included
+### Why EPAC?
 
-| Component | Count | Description |
-|-----------|-------|-------------|
-| **Policy Definitions** | 170+ | Custom ALZ policies (Deny, DeployIfNotExists, Audit) |
-| **Policy Initiatives** | 49 | Policy sets for MDFC, Diagnostics, Network Security, etc. |
-| **ALZ Version** | 2025-09-17 | Synced from Enterprise-Scale releases |
+| Benefit | Description |
+|---------|-------------|
+| **Mature & Battle-tested** | Used by Microsoft and enterprises worldwide |
+| **Separation of Concerns** | Policy lifecycle differs from infrastructure — manage them separately |
+| **Reduced Blast Radius** | No Root MG privileges required from this operator |
+| **Rich Feature Set** | Exemptions, assignments, initiatives, compliance reporting built-in |
+| **Active Community** | Regular updates, comprehensive documentation, Microsoft support |
 
-### Policy Categories
-
-| Category | Examples |
-|----------|----------|
-| **Network Security** | Deny-MgmtPorts-From-Internet, Deny-RDP-From-Internet, Deny-Subnet-Without-Nsg |
-| **Encryption** | Deny-Storage-minTLS, Deny-Sql-minTLS, Deny-Redis-http |
-| **Logging** | Deploy-Diagnostics-*, Deploy-Nsg-FlowLogs, Deploy-ActivityLogs |
-| **Defender** | Deploy-MDFC-Config, Deploy-ASC-SecurityContacts |
-| **Private Endpoints** | Deny-PublicEndpoint-*, Configure-Private-DNS-Zones |
-| **Cost Optimization** | Audit-UnusedResources, Deploy-Budget |
-
-### How It Works
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  ALZ POLICY DEPLOYMENT                                                       │
-│  ─────────────────────────────────────────────────────────────────────────── │
-│                                                                              │
-│  lib/policies/                                                               │
-│  ├── definitions/        # 170 individual policy JSON files                 │
-│  ├── initiatives/        # 49 individual initiative JSON files              │
-│  ├── definitions.json    # Combined array for Bicep loadJsonContent()       │
-│  ├── initiatives.json    # Combined array for Bicep loadJsonContent()       │
-│  └── sync.sh             # Script to update from Azure/Enterprise-Scale     │
-│                                                                              │
-│  bicep/policy/main.bicep                                                     │
-│       │                                                                      │
-│       ├── loadJsonContent('../../lib/policies/definitions.json')            │
-│       ├── loadJsonContent('../../lib/policies/initiatives.json')            │
-│       │                                                                      │
-│       ▼                                                                      │
-│  Deploys to Management Group scope:                                          │
-│  ├── All policy definitions (custom)                                         │
-│  ├── All policy initiatives (custom)                                         │
-│  └── Policy assignments (per specs/policy.yaml)                             │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Syncing Policies
+### Getting Started with EPAC
 
 ```bash
-# Initial sync or update to latest ALZ release
-./lib/policies/sync.sh
+# Install EPAC module
+Install-Module -Name EnterprisePolicyAsCode
 
-# Sync specific version
-./lib/policies/sync.sh 2025-09-17
+# Initialize EPAC in your repo
+New-EPACDefinitionsFolder -DefinitionsRootFolder Definitions
 
-# Check current version
-cat lib/policies/VERSION
+# Export existing policies
+Export-AzPolicyResources -DefinitionsRootFolder Definitions -Mode export
 ```
 
-### Policy Assignment via Spec
-
-```yaml
-# specs/policy.yaml
-apiVersion: alz.azure.com/v1alpha1
-kind: PolicySpec
-
-spec:
-  managementGroupId: contoso
-
-  # ALZ policies are automatically deployed from lib/policies/
-  # Here you configure which to ASSIGN and where
-
-  policyAssignments:
-    - name: Deploy-MDFC-Config
-      policyDefinitionId: /providers/Microsoft.Management/managementGroups/contoso/providers/Microsoft.Authorization/policySetDefinitions/Deploy-MDFC-Config
-      scope: /providers/Microsoft.Management/managementGroups/contoso
-      enforcementMode: Default
-
-    - name: Deny-MgmtPorts-From-Internet
-      policyDefinitionId: /providers/Microsoft.Management/managementGroups/contoso/providers/Microsoft.Authorization/policyDefinitions/Deny-MgmtPorts-From-Internet
-      scope: /providers/Microsoft.Management/managementGroups/landingzones
-      enforcementMode: Default
-```
-
-See [lib/policies/README.md](lib/policies/README.md) for detailed documentation.
+For complete documentation, see [EPAC on GitHub](https://github.com/Azure/enterprise-azure-policy-as-code).
 
 ---
 
@@ -311,7 +247,7 @@ See [lib/policies/README.md](lib/policies/README.md) for detailed documentation.
 │    ┌─────────────────────────────────────────────────────────────┐          │
 │    │              Single Deployment / State File                  │          │
 │    │                                                              │          │
-│    │  Management ──► Connectivity ──► Policy ──► Security        │          │
+│    │  Management ──► Connectivity ──► Security                   │          │
 │    │       ▲              │             │            │            │          │
 │    │       └──────────────┴─────────────┴────────────┘            │          │
 │    │                                                              │          │
@@ -344,10 +280,10 @@ See [lib/policies/README.md](lib/policies/README.md) for detailed documentation.
 │  │ Azure   │ │ Azure   │ │ Azure   │ │ Azure   │ │ Azure   │ │ Azure   │   │
 │  └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘   │
 │                                                                              │
-│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ + ExpressRoute │
-│  │ Management-Group│ │ Policy Operator │ │  Role Operator  │                │
-│  │     Operator    │ │                 │ │                 │                │
-│  └─────────────────┘ └─────────────────┘ └─────────────────┘                │
+│  ┌─────────────────┐                   ┌─────────────────┐ + ExpressRoute │
+│  │ Management-Group│                   │  Role Operator  │                │
+│  │     Operator    │                   │                 │                │
+│  └─────────────────┘                   └─────────────────┘                │
 │                                                                              │
 │  ✅ Loose Coupling:                                                          │
 │  • 16 operators run independently — failure in one doesn't affect others    │
@@ -567,7 +503,6 @@ Layer 4: Data Isolation
 | | `keyvault` | Security Sub | Key Vault Administrator | Manage Key Vaults only |
 | | `sentinel` | Security Sub | Log Analytics + Security Admin | Configure Sentinel |
 | **Governance** | `management-group` | Root MG | MG Contributor | Manage MG hierarchy only |
-| | `policy-operator` | Root MG | Resource Policy Contributor | Manage policies only |
 | | `role` | Root MG | User Access Administrator | Manage RBAC only |
 
 ---
@@ -654,14 +589,6 @@ spec:
         - roleDefinitionName: "Network Contributor"
           scope: "/subscriptions/00000000-0000-0000-0000-000000000000"
     
-    - name: policy-operator
-      displayName: "Azure Operator - Policy"
-      scope: management_group
-      managementGroupId: "root-mg"
-      roleAssignments:
-        - roleDefinitionName: "Resource Policy Contributor"
-          scope: "/providers/Microsoft.Management/managementGroups/root-mg"
-```
 
 ### Cascade vs. Pre-Provisioned Mode
 
@@ -788,16 +715,7 @@ See [scenarios/README.md](scenarios/README.md) for detailed documentation.
 - Azure Container Registry
 - Owner role on root Management Group (for RBAC deployment)
 
-### 1. Sync ALZ Policies
-
-```bash
-# Sync Azure Landing Zone policies from Enterprise-Scale
-./lib/policies/sync.sh
-
-# This downloads 170+ policy definitions and 49 initiatives
-```
-
-### 2. Build Operator Image
+### 1. Build Operator Image
 
 ```bash
 # Build distroless Docker image (compiles Bicep → ARM JSON)
@@ -807,7 +725,7 @@ make build
 ACR_NAME=your-acr make push-all
 ```
 
-### 3. Deploy Infrastructure
+### 2. Deploy Infrastructure
 
 ```bash
 # Deploy ACI operators with VNet isolation
@@ -956,27 +874,12 @@ azo build templates
 ### Run Locally
 
 ```bash
-# Sync ALZ policies (required before running policy operator)
-./lib/policies/sync.sh
-
 # Run operator locally (dry-run by default)
 export AZURE_SUBSCRIPTION_ID="your-sub-id"
 azo run management
 
 # Run with live deployment
 azo run connectivity --no-dry-run
-
-# Run policy operator (deploys 170+ definitions)
-azo run policy --management-group <mg-id>
-
-# Run bootstrap operator
-azo run bootstrap --subscription <sub-id>
-```
-
-### Deploy to Azure
-
-```bash
-# Deploy infrastructure
 azo deploy infra
 
 # Deploy RBAC (requires management group Owner)

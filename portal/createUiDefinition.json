@@ -267,12 +267,6 @@
             "label": "Governance Operators",
             "elements": [
               {
-                "name": "enablePolicy",
-                "type": "Microsoft.Common.CheckBox",
-                "label": "Azure Policy Operator",
-                "defaultValue": true
-              },
-              {
                 "name": "enableManagementGroups",
                 "type": "Microsoft.Common.CheckBox",
                 "label": "Management Groups Operator",
@@ -484,7 +478,6 @@
       "enableDefender": "[steps('operators').securityOperators.enableDefender]",
       "enableSentinel": "[steps('operators').securityOperators.enableSentinel]",
       "enableKeyVault": "[steps('operators').securityOperators.enableKeyVault]",
-      "enablePolicy": "[steps('operators').governanceOperators.enablePolicy]",
       "enableManagementGroups": "[steps('operators').governanceOperators.enableManagementGroups]",
       "gitRepoUrl": "[steps('gitConfig').gitRepoUrl]",
       "gitBranch": "[steps('gitConfig').gitBranch]",

@@ -7,7 +7,6 @@ from controller.models import (
     ConnectivitySpec,
     IdentitySpec,
     ManagementSpec,
-    PolicySpec,
     SecuritySpec,
     get_spec_class,
 )
@@ -147,28 +146,6 @@ class TestConnectivitySpec:
         assert spec.hub.name == "vnet-hub"
 
 
-class TestPolicySpec:
-    """Tests for PolicySpec model."""
-
-    def test_valid_spec(self) -> None:
-        """Test parsing a valid policy spec."""
-        data = {
-            "managementGroupId": "alz-root",
-            "managementGroups": [
-                {
-                    "name": "alz-platform",
-                    "displayName": "Platform",
-                    "parentId": "alz-root",
-                },
-            ],
-        }
-        spec = PolicySpec.model_validate(data)
-
-        assert spec.root_management_group_name == "alz-root"
-        assert len(spec.management_groups) == 1
-        assert spec.management_groups[0].name == "alz-platform"
-
-
 class TestSecuritySpec:
     """Tests for SecuritySpec model."""
 
@@ -260,11 +237,9 @@ class TestSpecRegistry:
         assert get_spec_class("sentinel") is SentinelSpec
 
         # Governance operators
-        from controller.models import ManagementGroupSpec, PolicyOperatorSpec, PolicySpec, RoleSpec
+        from controller.models import ManagementGroupSpec, RoleSpec
 
         assert get_spec_class("management-group") is ManagementGroupSpec
-        assert get_spec_class("policy-operator") is PolicyOperatorSpec
-        assert get_spec_class("policy") is PolicySpec
         assert get_spec_class("role") is RoleSpec
 
     def test_get_unknown_domain(self) -> None:

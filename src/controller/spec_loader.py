@@ -60,10 +60,8 @@ OPERATOR_TO_TEMPLATE: dict[str, str] = {
     "defender": "security",
     "keyvault": "security",
     "sentinel": "security",
-    # Governance operators → policy template
-    "management-group": "policy",
-    "policy-operator": "policy",
-    "policy": "policy",
+    # Governance operators → identity template
+    "management-group": "identity",
     "role": "identity",
     # Secondary region operators (same template as primary)
     "bastion-secondary": "connectivity",
