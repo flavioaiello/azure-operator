@@ -31,8 +31,7 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Compiled ARM templates (generated at build)
-templates/
+# Note: templates/ contains README and documentation (not generated ARM)
 
 # Bicep Configuration
 bicepconfig.json
