@@ -1,0 +1,20 @@
+# ============================================================================
+# Dockerfile for git-sync sidecar
+# Syncs specs from Git repository to shared volume
+# ============================================================================
+FROM alpine:3.19
+
+RUN apk add --no-cache git openssh-client ca-certificates
+
+# Create non-root user
+RUN adduser -D -u 65534 gitsync
+
+# Create directories
+RUN mkdir -p /specs /ssh && chown -R gitsync:gitsync /specs /ssh
+
+USER gitsync
+
+COPY --chown=gitsync:gitsync git-sync.sh /git-sync.sh
+RUN chmod +x /git-sync.sh
+
+ENTRYPOINT ["/git-sync.sh"]

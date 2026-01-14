@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
+# Note: build/ contains Dockerfiles and scripts (not Python artifacts)
 develop-eggs/
 dist/
 downloads/
