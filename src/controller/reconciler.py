@@ -541,7 +541,10 @@ class Reconciler:
         timestamp = int(time.time())
         random_suffix = random.randint(1000, 9999)
         # Truncate domain to ensure deployment name fits within ARM limit
-        max_domain_len = MAX_DEPLOYMENT_NAME_LENGTH - len(DEPLOYMENT_NAME_PREFIX) - 1 - 10 - 1 - 4 - 1
+        # Format: {prefix}-{domain}-{timestamp}-{suffix}
+        # Lengths: prefix + 1 + domain + 1 + 10 + 1 + 4 = prefix + domain + 17
+        reserved_len = len(DEPLOYMENT_NAME_PREFIX) + 17
+        max_domain_len = MAX_DEPLOYMENT_NAME_LENGTH - reserved_len
         truncated_domain = self._config.domain[:max_domain_len]
         deployment_name = (
             f"{DEPLOYMENT_NAME_PREFIX}-{truncated_domain}-{timestamp}-{random_suffix}"

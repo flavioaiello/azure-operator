@@ -50,12 +50,100 @@
         "description": "Network topology type."
       }
     },
-    "enabledOperators": {
-      "type": "array",
-      "defaultValue": [],
-      "metadata": {
-        "description": "List of operator names to deploy."
-      }
+    "enableFirewall": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Firewall operator." }
+    },
+    "enableBastion": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Bastion operator." }
+    },
+    "enableVpnGateway": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable VPN Gateway operator." }
+    },
+    "enableExpressRoute": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable ExpressRoute operator." }
+    },
+    "enableDns": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable DNS operator." }
+    },
+    "enableHubNetwork": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Hub Network operator." }
+    },
+    "enableVwan": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Virtual WAN operator." }
+    },
+    "enableVwanHub": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Virtual Hub operator." }
+    },
+    "enableVwanFirewall": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable vWAN Firewall operator." }
+    },
+    "enableVwanVpn": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable vWAN VPN Gateway operator." }
+    },
+    "enableVwanExpressRoute": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable vWAN ExpressRoute operator." }
+    },
+    "enableLogAnalytics": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Log Analytics operator." }
+    },
+    "enableAutomation": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Automation operator." }
+    },
+    "enableMonitor": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Monitor operator." }
+    },
+    "enableDefender": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Defender operator." }
+    },
+    "enableSentinel": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Sentinel operator." }
+    },
+    "enableKeyVault": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Key Vault operator." }
+    },
+    "enablePolicy": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Policy operator." }
+    },
+    "enableManagementGroups": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": { "description": "Enable Management Groups operator." }
     },
     "gitRepoUrl": {
       "type": "string",
@@ -155,7 +243,8 @@
     "aciDeploymentName": "[concat('aci-deploy-', uniqueString(deployment().name))]",
     "logAnalyticsName": "[concat('log-azure-operator-', uniqueString(parameters('resourceGroupName')))]",
     "ownerRoleDefinitionId": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",
-    "filteredOperators": "[filter(parameters('enabledOperators'), lambda('op', not(empty(lambdaVariables('op')))))]"
+    "enabledOperatorsRaw": "[createArray(if(parameters('enableFirewall'), 'firewall', ''), if(parameters('enableBastion'), 'bastion', ''), if(parameters('enableVpnGateway'), 'vpn-gateway', ''), if(parameters('enableExpressRoute'), 'expressroute', ''), if(parameters('enableDns'), 'dns', ''), if(parameters('enableHubNetwork'), 'hub-network', ''), if(parameters('enableVwan'), 'vwan', ''), if(parameters('enableVwanHub'), 'vwan-hub', ''), if(parameters('enableVwanFirewall'), 'vwan-firewall', ''), if(parameters('enableVwanVpn'), 'vwan-vpn-gateway', ''), if(parameters('enableVwanExpressRoute'), 'vwan-expressroute', ''), if(parameters('enableLogAnalytics'), 'log-analytics', ''), if(parameters('enableAutomation'), 'automation', ''), if(parameters('enableMonitor'), 'monitor', ''), if(parameters('enableDefender'), 'defender', ''), if(parameters('enableSentinel'), 'sentinel', ''), if(parameters('enableKeyVault'), 'keyvault', ''), if(parameters('enablePolicy'), 'policy-operator', ''), if(parameters('enableManagementGroups'), 'management-group', ''))]",
+    "filteredOperators": "[filter(variables('enabledOperatorsRaw'), lambda('op', not(empty(lambdaVariables('op')))))]"
   },
   "resources": [
     {

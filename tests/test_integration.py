@@ -98,7 +98,7 @@ class TestReconcilerIntegration:
 
     @pytest.mark.asyncio
     async def test_reconcile_creates_new_resources(
-        self, config: Config, temp_templates: Path, temp_specs: Path
+        self, config: Config, _temp_templates: Path, _temp_specs: Path
     ) -> None:
         """Test that reconciler creates resources when they don't exist."""
         with MockAzureContext() as ctx:
@@ -112,7 +112,7 @@ class TestReconcilerIntegration:
 
     @pytest.mark.asyncio
     async def test_reconcile_no_drift_when_resources_exist(
-        self, config: Config, temp_templates: Path, temp_specs: Path
+        self, config: Config, _temp_templates: Path, _temp_specs: Path
     ) -> None:
         """Test that reconciler detects no drift when resources already exist."""
         # Pre-populate state with existing resource
@@ -132,7 +132,7 @@ class TestReconcilerIntegration:
             }
         ]
 
-        with MockAzureContext(initial_resources=initial_resources) as ctx:
+        with MockAzureContext(initial_resources=initial_resources):
             reconciler = Reconciler(config)
             result = await reconciler._reconcile_once()
 
@@ -168,7 +168,7 @@ class TestReconcilerIntegration:
 
     @pytest.mark.asyncio
     async def test_deployment_failure_tracked(
-        self, config: Config, temp_templates: Path, temp_specs: Path
+        self, config: Config, _temp_templates: Path, _temp_specs: Path
     ) -> None:
         """Test that deployment failures are properly tracked."""
         with MockAzureContext(fail_deployments=True) as ctx:
@@ -182,11 +182,11 @@ class TestReconcilerIntegration:
 
     @pytest.mark.asyncio
     async def test_credential_is_managed_identity(
-        self, config: Config, temp_templates: Path, temp_specs: Path
+        self, config: Config, _temp_templates: Path, _temp_specs: Path
     ) -> None:
         """Test that reconciler uses managed identity credential."""
         with MockAzureContext(client_id="test-client-123") as ctx:
-            reconciler = Reconciler(config)
+            _ = Reconciler(config)  # Reconciler creation may trigger credential use
 
             # The credential should have been created
             assert ctx.credential.get_token_call_count >= 0  # May be called lazily
@@ -427,7 +427,10 @@ class TestALZManagementGroupScope:
                             "displayName": "Platform",
                             "details": {
                                 "parent": {
-                                    "id": "[concat('/providers/Microsoft.Management/managementGroups/', parameters('rootManagementGroupId'))]"
+                                    "id": (
+                                        "[concat('/providers/Microsoft.Management"
+                                        "/managementGroups/', parameters('rootManagementGroupId'))]"
+                                    )
                                 }
                             },
                         },
@@ -441,7 +444,10 @@ class TestALZManagementGroupScope:
                             "displayName": "Landing Zones",
                             "details": {
                                 "parent": {
-                                    "id": "[concat('/providers/Microsoft.Management/managementGroups/', parameters('rootManagementGroupId'))]"
+                                    "id": (
+                                        "[concat('/providers/Microsoft.Management"
+                                        "/managementGroups/', parameters('rootManagementGroupId'))]"
+                                    )
                                 }
                             },
                         },
@@ -511,7 +517,7 @@ class TestALZManagementGroupScope:
 
     @pytest.mark.asyncio
     async def test_management_group_whatif(
-        self, mg_config: Config, mg_templates: Path, mg_specs: Path
+        self, mg_config: Config, _mg_templates: Path, _mg_specs: Path
     ) -> None:
         """Test WhatIf at management group scope detects hierarchy changes."""
         with MockAzureContext() as ctx:
@@ -526,36 +532,41 @@ class TestALZManagementGroupScope:
 
     @pytest.mark.asyncio
     async def test_management_group_no_drift_when_exists(
-        self, mg_config: Config, mg_templates: Path, mg_specs: Path
+        self, mg_config: Config, _mg_templates: Path, _mg_specs: Path
     ) -> None:
         """Test no drift when management group hierarchy already exists."""
         # Pre-populate with existing management groups
+        mg_base = "/providers/Microsoft.Management/managementGroups"
         initial_resources = [
             {
-                "resource_id": "/providers/Microsoft.Management/managementGroups/contoso/providers/Microsoft.Management/managementGroups/contoso",
+                "resource_id": f"{mg_base}/contoso{mg_base}/contoso",
                 "resource_type": "Microsoft.Management/managementGroups",
                 "name": "contoso",
                 "location": "global",
                 "properties": {"displayName": "Contoso"},
             },
             {
-                "resource_id": "/providers/Microsoft.Management/managementGroups/contoso/providers/Microsoft.Management/managementGroups/platform",
+                "resource_id": f"{mg_base}/contoso{mg_base}/platform",
                 "resource_type": "Microsoft.Management/managementGroups",
                 "name": "platform",
                 "location": "global",
                 "properties": {
                     "displayName": "Platform",
-                    "details": {"parent": {"id": "/providers/Microsoft.Management/managementGroups/contoso"}},
+                    "details": {
+                        "parent": {"id": f"{mg_base}/contoso"}
+                    },
                 },
             },
             {
-                "resource_id": "/providers/Microsoft.Management/managementGroups/contoso/providers/Microsoft.Management/managementGroups/landingzones",
+                "resource_id": f"{mg_base}/contoso{mg_base}/landingzones",
                 "resource_type": "Microsoft.Management/managementGroups",
                 "name": "landingzones",
                 "location": "global",
                 "properties": {
                     "displayName": "Landing Zones",
-                    "details": {"parent": {"id": "/providers/Microsoft.Management/managementGroups/contoso"}},
+                    "details": {
+                        "parent": {"id": f"{mg_base}/contoso"}
+                    },
                 },
             },
         ]
@@ -624,7 +635,10 @@ class TestALZPolicyScope:
                 "spec": {
                     "managementGroupId": "contoso",
                     "policyAssignmentName": "Deploy-MDFC-Config",
-                    "policyDefinitionId": "/providers/Microsoft.Authorization/policySetDefinitions/1f3afdf9-d0c9-4c3d-847f-89da613e70a8",
+                    "policyDefinitionId": (
+                        "/providers/Microsoft.Authorization/policySetDefinitions/"
+                        "1f3afdf9-d0c9-4c3d-847f-89da613e70a8"
+                    ),
                     "enforcementMode": "Default",
                 },
             }
@@ -650,7 +664,7 @@ class TestALZPolicyScope:
 
     @pytest.mark.asyncio
     async def test_policy_deployment_at_mg_scope(
-        self, policy_config: Config, policy_templates: Path, policy_specs: Path
+        self, policy_config: Config, _policy_templates: Path, _policy_specs: Path
     ) -> None:
         """Test policy deployment at management group scope."""
         with MockAzureContext() as ctx:

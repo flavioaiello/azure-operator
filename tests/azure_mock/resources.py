@@ -237,12 +237,14 @@ class MockResourceState:
         Raises:
             ValueError: If resource limit exceeded.
         """
-        if resource.resource_id not in self._resources:
-            if len(self._resources) >= self.MAX_RESOURCES:
-                raise ValueError(
-                    f"Resource limit exceeded: {self.MAX_RESOURCES}. "
-                    "Clear state or increase MAX_RESOURCES."
-                )
+        if (
+            resource.resource_id not in self._resources
+            and len(self._resources) >= self.MAX_RESOURCES
+        ):
+            raise ValueError(
+                f"Resource limit exceeded: {self.MAX_RESOURCES}. "
+                "Clear state or increase MAX_RESOURCES."
+            )
 
         self._resources[resource.resource_id] = resource
         return resource
@@ -324,7 +326,7 @@ class MockResourceState:
     def compute_whatif(
         self,
         template: dict[str, Any],
-        parameters: dict[str, Any],
+        _parameters: dict[str, Any],
         subscription_id: str,
         resource_group: str | None = None,
         management_group_id: str | None = None,
@@ -505,16 +507,16 @@ class _MockDeploymentsOperations:
 
     def begin_what_if_at_subscription_scope(
         self,
-        deployment_name: str,
+        _deployment_name: str,
         parameters: Any,
-        **kwargs: Any,
+        **_kwargs: Any,
     ) -> _MockLROPoller:
         """Start a WhatIf operation at subscription scope.
 
         Args:
-            deployment_name: Name for the deployment.
+            _deployment_name: Name for the deployment (unused in mock).
             parameters: ScopedDeploymentWhatIf parameters.
-            **kwargs: Additional arguments.
+            **_kwargs: Additional arguments (unused in mock).
 
         Returns:
             Mock LRO poller with WhatIf result.
@@ -522,7 +524,7 @@ class _MockDeploymentsOperations:
         # Extract template and parameters from the deployment object
         template = parameters.properties.template
         params = parameters.properties.parameters or {}
-        location = parameters.location
+        _ = parameters.location  # Explicitly acknowledge unused
 
         whatif_result = self._state.compute_whatif(
             template=template,
@@ -536,14 +538,14 @@ class _MockDeploymentsOperations:
         self,
         deployment_name: str,
         parameters: Any,
-        **kwargs: Any,
+        **_kwargs: Any,
     ) -> _MockLROPoller:
         """Start a deployment at subscription scope.
 
         Args:
             deployment_name: Name for the deployment.
             parameters: ScopedDeployment parameters.
-            **kwargs: Additional arguments.
+            **_kwargs: Additional arguments (unused in mock).
 
         Returns:
             Mock LRO poller with deployment result.
@@ -592,17 +594,17 @@ class _MockDeploymentsOperations:
     def begin_what_if_at_management_group_scope(
         self,
         management_group_id: str,
-        deployment_name: str,
+        _deployment_name: str,
         parameters: Any,
-        **kwargs: Any,
+        **_kwargs: Any,
     ) -> _MockLROPoller:
         """Start a WhatIf operation at management group scope.
 
         Args:
             management_group_id: Target management group ID.
-            deployment_name: Name for the deployment.
+            _deployment_name: Name for the deployment (unused in mock).
             parameters: ScopedDeploymentWhatIf parameters.
-            **kwargs: Additional arguments.
+            **_kwargs: Additional arguments (unused in mock).
 
         Returns:
             Mock LRO poller with WhatIf result.
@@ -624,7 +626,7 @@ class _MockDeploymentsOperations:
         management_group_id: str,
         deployment_name: str,
         parameters: Any,
-        **kwargs: Any,
+        **_kwargs: Any,
     ) -> _MockLROPoller:
         """Start a deployment at management group scope.
 
@@ -632,7 +634,7 @@ class _MockDeploymentsOperations:
             management_group_id: Target management group ID.
             deployment_name: Name for the deployment.
             parameters: ScopedDeployment parameters.
-            **kwargs: Additional arguments.
+            **_kwargs: Additional arguments (unused in mock).
 
         Returns:
             Mock LRO poller with deployment result.
@@ -676,11 +678,11 @@ class _MockDeploymentsOperations:
 
         return _MockLROPoller(self._state.get_deployment(deployment_name))
 
-    def get(self, resource_group: str, deployment_name: str) -> MockDeployment | None:
+    def get(self, _resource_group: str, deployment_name: str) -> MockDeployment | None:
         """Get a deployment by name.
 
         Args:
-            resource_group: Resource group name.
+            _resource_group: Resource group name (unused, deployments stored by name).
             deployment_name: Deployment name.
 
         Returns:
@@ -706,11 +708,11 @@ class _MockLROPoller:
         self._result = result
         self._error = error
 
-    def result(self, timeout: int | None = None) -> Any:
+    def result(self, _timeout: int | None = None) -> Any:
         """Get the operation result.
 
         Args:
-            timeout: Ignored in mock.
+            _timeout: Ignored in mock.
 
         Returns:
             The operation result.

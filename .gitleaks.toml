@@ -1,0 +1,61 @@
+# Gitleaks Configuration
+#
+# This file configures gitleaks to ignore known false positives.
+# SECURITY: All allowlisted patterns MUST have documented justification.
+
+title = "Azure Operator Gitleaks Configuration"
+
+[extend]
+# Use default gitleaks rules
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for Azure-specific patterns"
+
+# SECURITY: These are Azure RBAC built-in role definition GUIDs.
+# They are public, well-documented Microsoft constants, NOT secrets.
+# Reference: https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+# 
+# Allowlisted GUIDs:
+# - 8e3af657-a8ff-443c-a75c-2fe8c4bcb635 = Owner
+# - b24988ac-6180-42a0-ab88-20f7382dd24c = Contributor
+# - acdd72a7-3385-48ef-bd42-f606fba81ae7 = Reader
+# - 18d7d88d-d35e-4fb5-a5c3-7773c20a72d9 = User Access Administrator
+# - 4d97b98b-1d4f-4787-a291-c67834d212e7 = Network Contributor
+# - fb1c8493-542b-48eb-b624-b4c8fea62acd = Security Admin
+# - 39bc4728-0917-49c7-9d2c-d95423bc2eb4 = Security Reader
+# - 92aaf0da-9dab-42b6-94a3-d43ce8d16293 = Log Analytics Contributor
+# - 73c42c96-874c-492b-b04d-ab87d138a893 = Log Analytics Reader
+# - 749f88d5-cbae-40b8-bcfc-e573ddc772fa = Monitoring Contributor
+# - 00482a5a-887f-4fb3-b363-3b7fe8e74483 = Key Vault Administrator
+# - 4633458b-17de-408a-b874-0445c86b69e6 = Key Vault Secrets User
+# - b12aa53e-6015-4669-85d0-8515ebb3ae7f = Private DNS Zone Contributor
+# - 36243c78-bf99-498c-9df9-86d9f8d28608 = Resource Policy Contributor
+# - f353d9bd-d4a6-484e-a77a-8050b599b867 = Automation Contributor
+# - 5d58bcaf-24a5-4b20-bdb6-eed9f69fbe4c = Management Group Contributor
+regexes = [
+    # Azure RBAC built-in role GUIDs - these are public Microsoft constants
+    '''8e3af657-a8ff-443c-a75c-2fe8c4bcb635''',
+    '''b24988ac-6180-42a0-ab88-20f7382dd24c''',
+    '''acdd72a7-3385-48ef-bd42-f606fba81ae7''',
+    '''18d7d88d-d35e-4fb5-a5c3-7773c20a72d9''',
+    '''4d97b98b-1d4f-4787-a291-c67834d212e7''',
+    '''fb1c8493-542b-48eb-b624-b4c8fea62acd''',
+    '''39bc4728-0917-49c7-9d2c-d95423bc2eb4''',
+    '''92aaf0da-9dab-42b6-94a3-d43ce8d16293''',
+    '''73c42c96-874c-492b-b04d-ab87d138a893''',
+    '''749f88d5-cbae-40b8-bcfc-e573ddc772fa''',
+    '''00482a5a-887f-4fb3-b363-3b7fe8e74483''',
+    '''4633458b-17de-408a-b874-0445c86b69e6''',
+    '''b12aa53e-6015-4669-85d0-8515ebb3ae7f''',
+    '''36243c78-bf99-498c-9df9-86d9f8d28608''',
+    '''f353d9bd-d4a6-484e-a77a-8050b599b867''',
+    '''5d58bcaf-24a5-4b20-bdb6-eed9f69fbe4c''',
+]
+
+paths = [
+    # Policy definitions are public Microsoft content synced from ALZ
+    '''lib/policies/.*\.json''',
+    # Lock files contain package hashes, not secrets
+    '''requirements.*\.lock\.txt''',
+]

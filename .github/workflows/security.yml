@@ -54,15 +54,17 @@ jobs:
           # Note: --ignore-vuln can be added with specific CVE/PYSEC IDs if
           # a vulnerability is a false positive or not applicable to our usage.
           # Each ignore MUST be documented in a comment with justification.
+          # Uses locked requirements with hashes for reproducible security scanning.
           pip-audit --require-hashes --strict --desc on \
-            -r requirements.txt \
-            -r requirements-dev.txt
+            -r requirements.lock.txt \
+            -r requirements-dev.lock.txt
         continue-on-error: false
 
       - name: Run safety check
         run: |
           # SECURITY: Cross-reference with Safety DB
-          safety check -r requirements.txt -r requirements-dev.txt --full-report
+          # Uses original requirements for safety check (lock files not required here)
+          safety check -r requirements.lock.txt -r requirements-dev.lock.txt --full-report
         continue-on-error: true  # Safety free tier has rate limits
 
   trivy-scan:
