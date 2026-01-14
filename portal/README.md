@@ -16,8 +16,9 @@ The wizard deploys the operator infrastructure:
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │  User-Assigned Managed Identity                          │   │
-│  │  └── Owner @ Subscription (or Management Group)         │   │
+│  │  User-Assigned Managed Identity (Bootstrap)              │   │
+│  │  ├── User Access Admin @ Subscription (constrained)      │   │
+│  │  └── Managed Identity Contributor @ Subscription        │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐   │

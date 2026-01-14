@@ -1280,8 +1280,8 @@ class BootstrapSpec(BaseSpec):
     3. Optionally, ACI container groups for operators
 
     This creates a cascade where:
-    - Phase 0: Infrastructure deploys Management operator with Owner at Root MG
-    - Phase 1: Management operator reads this spec and provisions all identities
+    - Phase 0: Infrastructure deploys Bootstrap operator with constrained UAA
+    - Phase 1: Bootstrap operator reads this spec and provisions all identities
     - Phase 2: Other operators start and use their provisioned UAMIs
 
     Tokens remain ephemeral - only the identity infrastructure is provisioned.

@@ -519,7 +519,7 @@ The bootstrap cascade pattern enables **ephemeral, zero-secret deployment** wher
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
 │  │  Creates ONLY:                                                          ││
 │  │  • Bootstrap Operator ACI container                                     ││
-│  │  • Bootstrap Operator UAMI (with Owner at Root MG)                      ││
+│  │  • Bootstrap Operator UAMI (with constrained UAA + MI Contributor)      ││
 │  │  • Private VNet + NSG                                                   ││
 │  │  • ACR (for operator images)                                            ││
 │  └─────────────────────────────────────────────────────────────────────────┘│
@@ -532,7 +532,7 @@ The bootstrap cascade pattern enables **ephemeral, zero-secret deployment** wher
 │  │  │  Operator        │  Creates:                                         ││
 │  │  │  (UAMI-Boot)     │  • 16 downstream UAMIs                            ││
 │  │  │                  │  • RBAC role assignments per operator             ││
-│  │  │  Owner @ Root MG │  • Operator ACI container groups (optional)       ││
+│  │  │  Constrained UAA │  • Operator ACI container groups (optional)       ││
 │  │  └────────┬─────────┘                                                   ││
 │  │           │                                                              ││
 │  │           ▼                                                              ││
@@ -597,7 +597,7 @@ spec:
 | **Identity creation** | Bootstrap operator provisions UAMIs | Bicep/Terraform pre-creates UAMIs |
 | **Deployment order** | Bootstrap → wait → operators | All operators start simultaneously |
 | **Flexibility** | Add operators via YAML | Add operators via IaC change |
-| **Chicken-and-egg** | Solved: Bootstrap has Owner at Root MG | Solved: IaC has privileged identity |
+| **Chicken-and-egg** | Solved: Bootstrap has constrained UAA | Solved: IaC has privileged identity |
 | **Environment variable** | Set `BOOTSTRAP_IDENTITY_RESOURCE_GROUP` | Not set (uses pre-assigned UAMI) |
 
 ### Enabling Cascade Mode
@@ -713,7 +713,11 @@ See [scenarios/README.md](scenarios/README.md) for detailed documentation.
 - Azure CLI with Bicep extension
 - Docker
 - Azure Container Registry
-- Owner role on root Management Group (for RBAC deployment)
+- **User Access Administrator** + **Managed Identity Contributor** at subscription scope (for bootstrap)
+
+> **Security Note:** The bootstrap operator uses constrained RBAC roles instead of Owner.
+> User Access Administrator is further restricted with conditions to only assign specific
+> least-privilege roles (Network Contributor, Log Analytics Contributor, etc.).
 
 ### 1. Build Operator Image
 
@@ -734,7 +738,8 @@ az deployment sub create \
   --template-file infrastructure/main.bicep \
   --parameters @infrastructure/main.example.bicepparam
 
-# Deploy RBAC (requires Owner at root MG)
+# Deploy RBAC (requires User Access Administrator at subscription/MG scope)
+# This assigns least-privilege roles to each downstream operator
 az deployment mg create \
   --location westeurope \
   --management-group-id your-root-mg \

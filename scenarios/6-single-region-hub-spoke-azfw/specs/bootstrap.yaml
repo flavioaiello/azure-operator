@@ -4,7 +4,7 @@
 # The bootstrap operator provisions these identities BEFORE other operators start.
 #
 # DEPLOYMENT ORDER:
-# 1. Infrastructure deploys Bootstrap operator with Owner at Root MG
+# 1. Infrastructure deploys Bootstrap operator with constrained UAA + MI Contributor
 # 2. Bootstrap operator reads this spec, creates UAMIs + RBAC
 # 3. Other operators start, wait for their identity, then begin reconciliation
 #

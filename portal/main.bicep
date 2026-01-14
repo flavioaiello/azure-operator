@@ -78,26 +78,58 @@ module identity 'modules/identity.bicep' = {
   }
 }
 
-// RBAC: Owner at subscription scope for bootstrap
-// SECURITY NOTE: This grants Owner at subscription scope which is overly permissive.
-// This is intentional for the Azure Portal wizard deployment to bootstrap operators.
-// After initial deployment, consider:
-// 1. Scope down to specific resource groups
-// 2. Use a custom role with only required permissions:
-//    - Microsoft.ManagedIdentity/userAssignedIdentities/* (for creating operator identities)
-//    - Microsoft.Authorization/roleAssignments/write (with conditions)
-//    - Microsoft.ContainerInstance/containerGroups/* (for deploying operators)
-// See: https://learn.microsoft.com/azure/role-based-access-control/custom-roles
-resource ownerRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(subscription().id, bootstrapIdentityName, 'Owner')
+// RBAC: Least-privilege roles for bootstrap operator
+// SECURITY: Grant only the permissions needed for bootstrap:
+// 1. User Access Administrator: Create RBAC assignments for downstream operators
+// 2. Managed Identity Contributor: Create UAMIs for each operator
+// These roles are scoped to subscription level (not root MG) for reduced blast radius.
+// For org-wide Landing Zones, create separate role assignments at each target MG.
+
+// User Access Administrator - for creating role assignments
+resource userAccessAdminRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(subscription().id, bootstrapIdentityName, 'UserAccessAdministrator')
   properties: {
     roleDefinitionId: subscriptionResourceId(
       'Microsoft.Authorization/roleDefinitions',
-      '8e3af657-a8ff-443c-a75c-2fe8c4bcb635' // Owner
+      '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9' // User Access Administrator
     )
     principalId: identity.outputs.principalId
     principalType: 'ServicePrincipal'
-    description: 'Bootstrap identity for azure-operator - Owner at subscription scope (reduce after initial setup)'
+    description: 'Bootstrap operator - User Access Administrator for assigning RBAC to downstream operators'
+    // SECURITY: Condition limits to creating assignments for specific roles only
+    condition: '''
+      (
+        !(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})
+      )
+      OR
+      (
+        @Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {
+          4d97b98b-1d4f-4787-a291-c67834d212e7,
+          92aaf0da-9dab-42b6-94a3-d43ce8d16293,
+          749f88d5-cbae-40b8-bcfc-e573ddc772fa,
+          fb1c8493-542b-48eb-b624-b4c8fea62acd,
+          5d58bcaf-24a5-4b20-bdb6-eed9f69fbe4c,
+          b12aa53e-6015-4669-85d0-8515ebb3ae7f,
+          00482a5a-887f-4fb3-b363-3b7fe8e74483,
+          f353d9bd-d4a6-484e-a77a-8050b599b867
+        }
+      )
+    '''
+    conditionVersion: '2.0'
+  }
+}
+
+// Managed Identity Contributor - for creating UAMIs
+resource managedIdentityContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(subscription().id, bootstrapIdentityName, 'ManagedIdentityContributor')
+  properties: {
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      'e40ec5ca-96e0-45a2-b4ff-59039f2c2b59' // Managed Identity Contributor
+    )
+    principalId: identity.outputs.principalId
+    principalType: 'ServicePrincipal'
+    description: 'Bootstrap operator - Managed Identity Contributor for creating downstream operator UAMIs'
   }
 }
 
@@ -118,7 +150,7 @@ module containerGroup 'modules/containerGroup.bicep' = {
   name: 'deploy-container-group'
   scope: rg
   dependsOn: [
-    ownerRoleAssignment // Wait for RBAC to propagate
+    userAccessAdminRoleAssignment // Wait for RBAC to propagate
   ]
   params: {
     containerGroupName: 'azure-operator-bootstrap'

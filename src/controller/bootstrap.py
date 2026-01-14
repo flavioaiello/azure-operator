@@ -1,13 +1,15 @@
 """Bootstrap cascade module for provisioning operator identities.
 
 This module implements the bootstrap cascade pattern where:
-1. The bootstrap operator runs first with elevated permissions (Owner at Root MG)
+1. The bootstrap operator runs first with constrained UAA + MI Contributor
 2. It provisions User-Assigned Managed Identities for all downstream operators
 3. It assigns RBAC roles to each identity
 4. Downstream operators wait for their identity before starting reconciliation
 
 SECURITY CONSIDERATIONS:
-- Bootstrap operator requires Owner at Root MG (chicken-and-egg resolved by infrastructure)
+- Bootstrap operator requires User Access Administrator (with conditions) + MI Contributor
+- UAA condition restricts role assignment to specific least-privilege roles only
+- Cannot escalate to Owner or higher-privilege roles
 - All created identities use least-privilege RBAC
 - Tokens remain ephemeral - only identity infrastructure is provisioned
 - RBAC propagation delay is explicitly handled (Azure AD replication)
