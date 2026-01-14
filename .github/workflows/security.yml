@@ -130,9 +130,9 @@ jobs:
 
       - name: Install Bicep CLI
         run: |
-          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
-          chmod +x ./bicep
-          sudo mv ./bicep /usr/local/bin/bicep
+          curl -Lo bicep-cli https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x ./bicep-cli
+          sudo mv ./bicep-cli /usr/local/bin/bicep
 
       - name: Validate Bicep templates
         run: |
