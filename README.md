@@ -1,6 +1,6 @@
 # Azure Landing Zone Operator
 
-> **"Azure Landing Zones should have been built this way from the start."**
+> **Landing Zones, and Enterprise Runways.**
 >
 > *Continuous reconciliation. Secretless. GitOps-native. The operator pattern that cloud infrastructure deserves.*
 
