@@ -39,12 +39,12 @@ param subscriptionRoleAssignments array = []
 // ============================================================================
 
 // Custom Role Definitions using AVM module
-module customRoles 'br/public:avm/ptn/authorization/role-definition:0.2.0' = [
+module customRoles 'br/public:avm/ptn/authorization/role-definition:0.1.1' = [
   for (role, index) in roleDefinitions: {
     name: 'deploy-role-${index}-${uniqueString(deployment().name, location)}'
     params: {
       name: role.name
-      roleName: role.roleName
+      roleName: role.?roleName ?? role.name
       description: role.?description ?? ''
       actions: role.?actions ?? []
       notActions: role.?notActions ?? []
@@ -59,13 +59,13 @@ module customRoles 'br/public:avm/ptn/authorization/role-definition:0.2.0' = [
 ]
 
 // Management Group Role Assignments using AVM module
-module mgRoleAssignments 'br/public:avm/ptn/authorization/role-assignment:0.2.0' = [
+module mgRoleAssignments 'br/public:avm/ptn/authorization/role-assignment:0.2.4' = [
   for (assignment, index) in managementGroupRoleAssignments: {
     name: 'deploy-mgra-${index}-${uniqueString(deployment().name, location)}'
     scope: managementGroup(assignment.?managementGroupId ?? managementGroupId)
     params: {
       principalId: assignment.principalId
-      roleDefinitionId: assignment.roleDefinitionId
+      roleDefinitionIdOrName: assignment.roleDefinitionId
       principalType: assignment.?principalType ?? 'ServicePrincipal'
       description: assignment.?description ?? ''
       condition: assignment.?condition
@@ -75,16 +75,17 @@ module mgRoleAssignments 'br/public:avm/ptn/authorization/role-assignment:0.2.0'
   }
 ]
 
-// Subscription-scoped role assignments (deployed via nested subscription scope)
-module subRoleAssignments 'modules/subscription-role-assignment.bicep' = [
+// Subscription-scoped role assignments using AVM module
+module subRoleAssignments 'br/public:avm/ptn/authorization/role-assignment:0.2.4' = [
   for (assignment, index) in subscriptionRoleAssignments: {
     name: 'deploy-subra-${index}-${uniqueString(deployment().name, location)}'
-    scope: subscription(assignment.subscriptionId)
     params: {
       principalId: assignment.principalId
-      roleDefinitionId: assignment.roleDefinitionId
+      roleDefinitionIdOrName: assignment.roleDefinitionId
+      subscriptionId: assignment.subscriptionId
       principalType: assignment.?principalType ?? 'ServicePrincipal'
       description: assignment.?description ?? ''
+      enableTelemetry: enableTelemetry
     }
   }
 ]
@@ -93,11 +94,11 @@ module subRoleAssignments 'modules/subscription-role-assignment.bicep' = [
 // Outputs
 // ============================================================================
 
-@description('The IDs of custom role definitions.')
-output roleDefinitionIds array = [for (role, index) in roleDefinitions: customRoles[index].outputs.resourceId]
+@description('The custom role definitions (object with resourceId, roleDefinitionId, displayName).')
+output roleDefinitions array = [for (role, index) in roleDefinitions: customRoles[index].outputs.managementGroupCustomRoleDefinitionIds]
 
 @description('The IDs of management group role assignments.')
 output managementGroupRoleAssignmentIds array = [for (assignment, index) in managementGroupRoleAssignments: mgRoleAssignments[index].outputs.resourceId]
 
-@description('The count of subscription role assignments.')
-output subscriptionRoleAssignmentCount int = length(subscriptionRoleAssignments)
+@description('The IDs of subscription role assignments.')
+output subscriptionRoleAssignmentIds array = [for (assignment, index) in subscriptionRoleAssignments: subRoleAssignments[index].outputs.resourceId]

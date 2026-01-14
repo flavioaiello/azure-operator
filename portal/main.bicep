@@ -119,7 +119,6 @@ module containerGroup 'modules/containerGroup.bicep' = {
   scope: rg
   dependsOn: [
     ownerRoleAssignment // Wait for RBAC to propagate
-    logAnalytics // Ensure Log Analytics is created before listKeys() is called
   ]
   params: {
     containerGroupName: 'azure-operator-bootstrap'
