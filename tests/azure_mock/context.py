@@ -128,7 +128,11 @@ class MockAzureContext:
         self._patches.append(credential_patch)
 
         # Create factory for ResourceManagementClient that uses our state
-        def create_mock_client(_credential: Any, subscription_id: str) -> MockResourceClient:
+        def create_mock_client(
+            credential: Any, subscription_id: str, **_kwargs: Any
+        ) -> MockResourceClient:
+            # Accept credential and any additional kwargs (e.g., api_version)
+            _ = credential  # Unused but required for signature compatibility
             return MockResourceClient(
                 state=self._state,
                 subscription_id=subscription_id,

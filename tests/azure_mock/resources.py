@@ -326,7 +326,7 @@ class MockResourceState:
     def compute_whatif(
         self,
         template: dict[str, Any],
-        _parameters: dict[str, Any],
+        parameters: dict[str, Any],  # noqa: ARG002 - kept for API compatibility
         subscription_id: str,
         resource_group: str | None = None,
         management_group_id: str | None = None,

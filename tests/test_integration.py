@@ -98,9 +98,10 @@ class TestReconcilerIntegration:
 
     @pytest.mark.asyncio
     async def test_reconcile_creates_new_resources(
-        self, config: Config, _temp_templates: Path, _temp_specs: Path
+        self, config: Config, temp_templates: Path, temp_specs: Path
     ) -> None:
         """Test that reconciler creates resources when they don't exist."""
+        _ = temp_templates, temp_specs  # Used to trigger fixture setup
         with MockAzureContext() as ctx:
             reconciler = Reconciler(config)
             result = await reconciler._reconcile_once()
@@ -112,9 +113,10 @@ class TestReconcilerIntegration:
 
     @pytest.mark.asyncio
     async def test_reconcile_no_drift_when_resources_exist(
-        self, config: Config, _temp_templates: Path, _temp_specs: Path
+        self, config: Config, temp_templates: Path, temp_specs: Path
     ) -> None:
         """Test that reconciler detects no drift when resources already exist."""
+        _ = temp_templates, temp_specs  # Used to trigger fixture setup
         # Pre-populate state with existing resource
         initial_resources = [
             {
@@ -168,9 +170,10 @@ class TestReconcilerIntegration:
 
     @pytest.mark.asyncio
     async def test_deployment_failure_tracked(
-        self, config: Config, _temp_templates: Path, _temp_specs: Path
+        self, config: Config, temp_templates: Path, temp_specs: Path
     ) -> None:
         """Test that deployment failures are properly tracked."""
+        _ = temp_templates, temp_specs  # Used to trigger fixture setup
         with MockAzureContext(fail_deployments=True) as ctx:
             reconciler = Reconciler(config)
             result = await reconciler._reconcile_once()
@@ -182,9 +185,10 @@ class TestReconcilerIntegration:
 
     @pytest.mark.asyncio
     async def test_credential_is_managed_identity(
-        self, config: Config, _temp_templates: Path, _temp_specs: Path
+        self, config: Config, temp_templates: Path, temp_specs: Path
     ) -> None:
         """Test that reconciler uses managed identity credential."""
+        _ = temp_templates, temp_specs  # Used to trigger fixture setup
         with MockAzureContext(client_id="test-client-123") as ctx:
             _ = Reconciler(config)  # Reconciler creation may trigger credential use
 
@@ -517,9 +521,10 @@ class TestALZManagementGroupScope:
 
     @pytest.mark.asyncio
     async def test_management_group_whatif(
-        self, mg_config: Config, _mg_templates: Path, _mg_specs: Path
+        self, mg_config: Config, mg_templates: Path, mg_specs: Path
     ) -> None:
         """Test WhatIf at management group scope detects hierarchy changes."""
+        _ = mg_templates, mg_specs  # Used to trigger fixture setup
         with MockAzureContext() as ctx:
             reconciler = Reconciler(mg_config)
             result = await reconciler._reconcile_once()
@@ -532,9 +537,10 @@ class TestALZManagementGroupScope:
 
     @pytest.mark.asyncio
     async def test_management_group_no_drift_when_exists(
-        self, mg_config: Config, _mg_templates: Path, _mg_specs: Path
+        self, mg_config: Config, mg_templates: Path, mg_specs: Path
     ) -> None:
         """Test no drift when management group hierarchy already exists."""
+        _ = mg_templates, mg_specs  # Used to trigger fixture setup
         # Pre-populate with existing management groups
         mg_base = "/providers/Microsoft.Management/managementGroups"
         initial_resources = [
@@ -664,9 +670,10 @@ class TestALZPolicyScope:
 
     @pytest.mark.asyncio
     async def test_policy_deployment_at_mg_scope(
-        self, policy_config: Config, _policy_templates: Path, _policy_specs: Path
+        self, policy_config: Config, policy_templates: Path, policy_specs: Path
     ) -> None:
         """Test policy deployment at management group scope."""
+        _ = policy_templates, policy_specs  # Used to trigger fixture setup
         with MockAzureContext() as ctx:
             reconciler = Reconciler(policy_config)
             result = await reconciler._reconcile_once()
