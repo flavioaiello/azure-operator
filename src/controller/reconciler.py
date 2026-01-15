@@ -55,6 +55,14 @@ from .config import (
     Config,
     DeploymentScope,
 )
+from .guardrails import (
+    GuardrailEnforcer,
+    GuardrailsConfig,
+    GuardrailViolation,
+    KillSwitchActive,
+    RateLimitViolation,
+    ScopeViolation,
+)
 from .resource_graph import GraphQueryResult, ResourceChange, ResourceGraphQuerier
 from .security import get_managed_identity_credential
 from .spec_loader import SpecLoadError, load_spec, load_template
@@ -153,6 +161,10 @@ class Reconciler:
                 credential=self._credential,
                 config=config,
             )
+
+        # SECURITY: Guardrails enforcer for blast radius control
+        # Enforces kill switch, scope allowlists, and rate limits
+        self._guardrails = GuardrailEnforcer(GuardrailsConfig.from_env())
 
         self._shutdown_event = asyncio.Event()
 
@@ -258,6 +270,38 @@ class Reconciler:
         logger.info("Shutdown requested", extra={"domain": self._config.domain})
         self._shutdown_event.set()
 
+    def _check_scope_guardrails(self) -> None:
+        """Check if deployment scope is allowed by guardrails.
+
+        Validates the current deployment scope (management group, subscription,
+        or resource group) against the configured allowlists and denylists.
+
+        Raises:
+            ScopeViolation: If the scope is denied or not in allowlist.
+        """
+        # Import here to avoid circular import
+        from .config import DeploymentScope
+
+        match self._config.scope:
+            case DeploymentScope.MANAGEMENT_GROUP:
+                if self._config.management_group_id:
+                    self._guardrails.check_scope(
+                        "management_group", self._config.management_group_id
+                    )
+            case DeploymentScope.SUBSCRIPTION:
+                self._guardrails.check_scope(
+                    "subscription", self._config.subscription_id
+                )
+            case DeploymentScope.RESOURCE_GROUP:
+                # Resource group scope requires subscription check too
+                self._guardrails.check_scope(
+                    "subscription", self._config.subscription_id
+                )
+                if self._config.resource_group_name:
+                    # Resource groups use subscription guardrails
+                    # No separate resource group allowlist needed currently
+                    pass
+
     async def _reconcile_once(self) -> ReconcileResult:
         """Execute a single reconciliation cycle.
 
@@ -274,6 +318,12 @@ class Reconciler:
         graph_result: GraphQueryResult | None = None
 
         try:
+            # GUARDRAIL: Check kill switch before any operations
+            self._guardrails.check_kill_switch()
+
+            # GUARDRAIL: Check scope is allowed
+            self._check_scope_guardrails()
+
             # Load and validate spec
             spec = load_spec(self._config.specs_dir, self._config.domain)
             params = spec.to_arm_parameters()
@@ -364,8 +414,14 @@ class Reconciler:
                 result.end_time = datetime.now(UTC)
                 return result
 
+            # GUARDRAIL: Check rate limits before apply
+            self._guardrails.check_rate_limit(resource_changes=len(significant_changes))
+
             # Apply changes with retry logic
             await self._apply_with_retry(params)
+
+            # GUARDRAIL: Record changes for rate limiting
+            self._guardrails.record_changes(resource_changes=len(significant_changes))
 
             logger.info(
                 "Reconciliation complete",
@@ -377,6 +433,19 @@ class Reconciler:
 
         except SpecLoadError as e:
             logger.error("Failed to load spec", extra={"error": str(e)})
+            result.error = e
+        except KillSwitchActive as e:
+            # Kill switch is not an error - it's intentional blocking
+            logger.warning("Kill switch active, apply blocked", extra={"domain": self._config.domain})
+            result.error = e
+        except ScopeViolation as e:
+            logger.error("Scope guardrail violation", extra={"error": str(e)})
+            result.error = e
+        except RateLimitViolation as e:
+            logger.warning("Rate limit exceeded", extra={"error": str(e)})
+            result.error = e
+        except GuardrailViolation as e:
+            logger.error("Guardrail violation", extra={"error": str(e)})
             result.error = e
         except HttpResponseError as e:
             logger.error(
