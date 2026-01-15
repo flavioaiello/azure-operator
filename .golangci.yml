@@ -1,0 +1,141 @@
+# golangci-lint configuration
+# Aligned with AGENTS.md security-first principles
+
+run:
+  timeout: 5m
+  tests: true
+  go: "1.22"
+
+linters:
+  enable:
+    # Security
+    - gosec          # Security issues
+    - gocritic       # Code quality
+    
+    # Bugs
+    - govet          # Go vet
+    - staticcheck    # Static analysis
+    - ineffassign    # Ineffective assignments
+    - typecheck      # Type checking
+    - errcheck       # Error checking
+    - bodyclose      # HTTP body close
+    - nilerr         # Nil error returns
+    - sqlclosecheck  # SQL close checking
+    
+    # Style
+    - gofmt          # Format checking
+    - goimports      # Import organization
+    - misspell       # Spelling
+    - unconvert      # Unnecessary conversions
+    - unparam        # Unused parameters
+    - revive         # Fast, configurable linter
+    
+    # Complexity
+    - gocyclo        # Cyclomatic complexity
+    - gocognit       # Cognitive complexity
+    - nestif         # Nested if depth
+    - funlen         # Function length
+    
+    # Performance
+    - prealloc       # Slice preallocation hints
+    - exportloopref  # Loop variable capture
+    
+    # Documentation
+    - godot          # Comment period
+    
+  disable:
+    - depguard       # Dependency guard (manual control preferred)
+
+linters-settings:
+  gosec:
+    severity: high
+    confidence: high
+    excludes:
+      - G104  # Unhandled errors (covered by errcheck)
+      - G304  # File path inclusion (we validate paths)
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+      - opinionated
+
+  gocyclo:
+    min-complexity: 15
+
+  gocognit:
+    min-complexity: 20
+
+  funlen:
+    lines: 100
+    statements: 50
+
+  nestif:
+    min-complexity: 4
+
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - (io.Closer).Close
+      - (*go.uber.org/zap.Logger).Sync
+
+issues:
+  exclude-rules:
+    # Allow long functions in tests
+    - path: _test\.go
+      linters:
+        - funlen
+        - gocyclo
+        - gocognit
+
+    # Allow magic numbers in tests
+    - path: _test\.go
+      linters:
+        - gomnd
+
+    # Allow unused parameters in interface implementations
+    - linters:
+        - unparam
+      text: "always receives"
+
+  max-issues-per-linter: 50
+  max-same-issues: 10
+
+severity:
+  default-severity: error
+  rules:
+    - linters:
+        - gosec
+      severity: error
+    - linters:
+        - gocritic
+      severity: warning
