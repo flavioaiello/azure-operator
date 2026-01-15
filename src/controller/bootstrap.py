@@ -12,7 +12,7 @@ SECURITY CONSIDERATIONS:
 - Cannot escalate to Owner or higher-privilege roles
 - All created identities use least-privilege RBAC
 - Tokens remain ephemeral - only identity infrastructure is provisioned
-- RBAC propagation delay is explicitly handled (Azure AD replication)
+- RBAC propagation delay is explicitly handled (Entra ID replication)
 
 IMPLEMENTATION NOTE:
 Uses ARM deployments for identity provisioning to minimize SDK dependencies.

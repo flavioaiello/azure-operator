@@ -86,7 +86,7 @@ class SecurityConfig:
     - ALL authentication uses User-Assigned Managed Identities (UAMIs)
     - NO service principal secrets or passwords are allowed
     - NO credentials are stored in environment variables or files
-    - ALL Azure API calls are authenticated via Azure AD / Entra ID tokens
+    - ALL Azure API calls are authenticated via Entra ID tokens
 
     This is NOT configurable - secretless is mandatory by design.
     See src/controller/security.py for enforcement details.

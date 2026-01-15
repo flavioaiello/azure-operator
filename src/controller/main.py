@@ -4,7 +4,7 @@ SECRETLESS ARCHITECTURE:
 This operator enforces a secretless security model where:
 - ALL authentication uses User-Assigned Managed Identities (UAMIs)
 - NO service principal secrets or passwords are allowed
-- Credentials are NEVER stored - Azure AD tokens are ephemeral
+- Credentials are NEVER stored - Entra ID tokens are ephemeral
 
 Supports bootstrap cascade pattern:
 - Bootstrap operator: provisions UAMIs for downstream operators

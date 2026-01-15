@@ -29,7 +29,7 @@ spec:
   containerRegistry: youracr.azurecr.io
   operatorImageTag: latest
   
-  # Wait 2 minutes for Azure AD RBAC replication
+  # Wait 2 minutes for Entra ID RBAC replication
   rbacPropagationSeconds: 120
   
   # Deploy operators as ACI containers after identity provisioning

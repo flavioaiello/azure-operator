@@ -1426,8 +1426,8 @@ class BootstrapSpec(BaseSpec):
     # Operator identity definitions
     operators: list[OperatorIdentityConfig] = Field(default_factory=list)
 
-    # RBAC propagation wait time (Azure AD replication delay)
-    # SECURITY: Minimum 60s required - Azure AD replication typically needs 60-120s
+    # RBAC propagation wait time (Entra ID replication delay)
+    # SECURITY: Minimum 60s required - Entra ID replication typically needs 60-120s
     rbac_propagation_seconds: int = Field(120, alias="rbacPropagationSeconds", ge=60, le=600)
 
     # Deploy operators as ACI containers (vs just creating identities)

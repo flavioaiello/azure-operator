@@ -414,14 +414,14 @@ This framework enforces a **secretless security model** — there are zero secre
 │  │  ❌ No connection strings           ❌ No username/password              ││
 │  │                                                                          ││
 │  │  ✅ User-Assigned Managed Identities (UAMIs) only                       ││
-│  │  ✅ Ephemeral Azure AD tokens (never stored)                            ││
+│  │  ✅ Ephemeral Entra ID tokens (never stored)                             ││
 │  │  ✅ Automatic token refresh by Azure runtime                            ││
 │  └─────────────────────────────────────────────────────────────────────────┘│
 │                                                                              │
 │  How Authentication Works:                                                   │
 │                                                                              │
 │  ┌──────────────┐     token request     ┌─────────────────────┐             │
-│  │   Operator   │ ────────────────────► │  Azure AD/Entra ID  │             │
+│  │   Operator   │ ────────────────────► │     Entra ID        │             │
 │  │   (ACI)      │                       │                     │             │
 │  │              │ ◄──────────────────── │  Issues short-lived │             │
 │  │   with UAMI  │     JWT token         │  JWT (~1hr validity)│             │
@@ -431,7 +431,7 @@ This framework enforces a **secretless security model** — there are zero secre
 │         ▼                                                                    │
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
 │  │                    Azure Resource Manager                                ││
-│  │  • Validates token signature (Azure AD public keys)                     ││
+│  │  • Validates token signature (Entra ID public keys)                      ││
 │  │  • Checks RBAC: Does UAMI have permission for this operation?           ││
 │  │  • Audit log: Records who did what (tied to UAMI identity)              ││
 │  └─────────────────────────────────────────────────────────────────────────┘│
@@ -639,7 +639,7 @@ spec:
   identityResourceGroup: rg-operator-identities
   operatorsResourceGroup: rg-operators
   containerRegistry: youracr.azurecr.io
-  rbacPropagationSeconds: 120  # Wait for Azure AD replication
+  rbacPropagationSeconds: 120  # Wait for Entra ID replication
   deployOperators: true
   
   operators:

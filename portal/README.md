@@ -156,4 +156,4 @@ az container logs -g rg-azure-operator -n azure-operator-bootstrap --container-n
 ```
 
 ### RBAC not propagating
-Azure AD replication can take up to 10 minutes. The bootstrap operator handles this with retry logic.
+Entra ID replication can take up to 10 minutes. The bootstrap operator handles this with retry logic.

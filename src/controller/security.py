@@ -8,12 +8,12 @@ This module enforces the secretless security model where:
 SECURITY INVARIANTS:
 1. AZURE_CLIENT_SECRET must never be present in the environment
 2. ManagedIdentityCredential is the ONLY allowed credential type
-3. All authentication flows through Azure AD / Entra ID
+3. All authentication flows through Entra ID
 
 Why Secretless?
 - Zero secrets to rotate, leak, or manage
 - RBAC scoped to exactly what each operator needs
-- Full audit trail via Azure AD / Entra ID
+- Full audit trail via Entra ID
 - Zero trust - identity verified on every Azure API call
 - Token lifecycle managed by Azure, not by us
 """

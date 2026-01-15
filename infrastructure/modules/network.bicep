@@ -98,7 +98,7 @@ resource operatorNsg 'Microsoft.Network/networkSecurityGroups@2024-01-01' = {
           destinationPortRange: '443'
           sourceAddressPrefix: 'VirtualNetwork'
           destinationAddressPrefix: azureActiveDirectoryServiceTag
-          description: 'Allow Azure AD for managed identity authentication'
+          description: 'Allow Entra ID for managed identity authentication'
         }
       }
       {
