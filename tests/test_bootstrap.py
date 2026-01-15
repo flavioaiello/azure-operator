@@ -138,8 +138,8 @@ class TestOperatorIdentityConfig:
     def test_default_resource_allocation(self) -> None:
         """Test default CPU/memory allocation."""
         config = OperatorIdentityConfig.model_validate({"name": "test"})
-        assert config.cpu_cores == 0.5
-        assert config.memory_gb == 1.0
+        assert abs(config.cpu_cores - 0.5) < 1e-9
+        assert abs(config.memory_gb - 1.0) < 1e-9
 
     def test_display_name_alias(self) -> None:
         """Test displayName alias works."""

@@ -327,9 +327,6 @@
       "type": "Microsoft.Authorization/roleAssignments",
       "apiVersion": "2022-04-01",
       "name": "[guid(parameters('bootstrapIdentityName'), variables('ownerRoleDefinitionId'), subscription().id)]",
-      "dependsOn": [
-        "[variables('identityDeploymentName')]"
-      ],
       "properties": {
         "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('ownerRoleDefinitionId'))]",
         "principalId": "[reference(variables('identityDeploymentName')).outputs.identityPrincipalId.value]",
@@ -344,7 +341,6 @@
       "subscriptionId": "[variables('subscriptionId')]",
       "resourceGroup": "[parameters('resourceGroupName')]",
       "dependsOn": [
-        "[variables('identityDeploymentName')]",
         "[guid(parameters('bootstrapIdentityName'), variables('ownerRoleDefinitionId'), subscription().id)]"
       ],
       "properties": {

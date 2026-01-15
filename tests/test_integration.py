@@ -6,6 +6,7 @@ without actual Azure connectivity.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -21,7 +22,7 @@ class TestReconcilerIntegration:
     """Integration tests for Reconciler with mocked Azure APIs."""
 
     @pytest.fixture
-    def temp_templates(self) -> Path:
+    def temp_templates(self) -> Generator[Path, None, None]:
         """Create temporary templates directory with test template."""
         with TemporaryDirectory() as tmpdir:
             templates_dir = Path(tmpdir) / "templates"
@@ -57,7 +58,7 @@ class TestReconcilerIntegration:
             yield templates_dir
 
     @pytest.fixture
-    def temp_specs(self) -> Path:
+    def temp_specs(self) -> Generator[Path, None, None]:
         """Create temporary specs directory with test spec."""
         with TemporaryDirectory() as tmpdir:
             specs_dir = Path(tmpdir) / "specs"
@@ -201,7 +202,7 @@ class TestCircuitBreakerIntegration:
     """Integration tests for circuit breaker behavior."""
 
     @pytest.fixture
-    def quick_config(self) -> Path:
+    def quick_config(self) -> Generator[Config, None, None]:
         """Create a config with fast intervals for testing."""
         with TemporaryDirectory() as tmpdir:
             templates_dir = Path(tmpdir) / "templates"
@@ -399,7 +400,7 @@ class TestALZManagementGroupScope:
     """
 
     @pytest.fixture
-    def mg_templates(self) -> Path:
+    def mg_templates(self) -> Generator[Path, None, None]:
         """Create templates for management-group operator."""
         with TemporaryDirectory() as tmpdir:
             templates_dir = Path(tmpdir) / "templates"
@@ -467,7 +468,7 @@ class TestALZManagementGroupScope:
             yield templates_dir
 
     @pytest.fixture
-    def mg_specs(self) -> Path:
+    def mg_specs(self) -> Generator[Path, None, None]:
         """Create specs for management-group operator."""
         with TemporaryDirectory() as tmpdir:
             specs_dir = Path(tmpdir) / "specs"

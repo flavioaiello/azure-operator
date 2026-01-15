@@ -8,13 +8,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    pass
+from typing import Any
 
 # Token validity duration
 TOKEN_VALIDITY_HOURS = 1
+
+
+class MockCredentialError(Exception):
+    """Mock credential authentication error.
+
+    Simulates Azure SDK's ClientAuthenticationError for test scenarios.
+    """
+
+    pass
 
 
 @dataclass
@@ -111,10 +117,7 @@ class MockManagedIdentityCredential:
 
         # Check if we should fail
         if self._should_fail:
-            # TEST MOCK: Intentionally raise bare Exception to simulate Azure SDK's
-            # ClientAuthenticationError behavior without importing azure.core in test code.
-            # TRY002 warns against bare Exception, but this is deliberate test behavior.
-            raise Exception(self._failure_message)
+            raise MockCredentialError(self._failure_message)
 
         # Generate a fake token
         self._token_counter += 1

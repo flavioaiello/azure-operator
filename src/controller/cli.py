@@ -28,6 +28,11 @@ DEFAULT_IMAGE_TAG = "latest"
 IMAGE_NAME = "azure-operator"
 DOMAINS = ("management", "connectivity", "policy", "security", "identity")
 
+# Directory constants
+TESTS_DIR = "tests/"
+SRC_DIR = "src/"
+MAIN_BICEP_FILENAME = "main.bicep"
+
 # Timeout constants (seconds)
 COMMAND_TIMEOUT_SECONDS = 300
 BUILD_TIMEOUT_SECONDS = 600
@@ -204,7 +209,7 @@ def test(coverage: bool, verbose: bool, filter_expr: str | None) -> None:
     ensure_venv()
     pytest = str(get_venv_bin("pytest"))
 
-    cmd = [pytest, "tests/"]
+    cmd = [pytest, TESTS_DIR]
     if verbose:
         cmd.append("-v")
     if coverage:
@@ -227,13 +232,13 @@ def lint(fix: bool) -> None:
     ruff = str(get_venv_bin("ruff"))
 
     click.echo("Checking Python code...")
-    cmd = [ruff, "check", "src/", "tests/"]
+    cmd = [ruff, "check", SRC_DIR, TESTS_DIR]
     if fix:
         cmd.append("--fix")
     run_command(cmd)
 
     click.echo("\nChecking formatting...")
-    run_command([ruff, "format", "--check", "src/", "tests/"])
+    run_command([ruff, "format", "--check", SRC_DIR, TESTS_DIR])
 
     click.secho("✓ All lint checks passed!", fg="green")
 
@@ -245,8 +250,8 @@ def fmt() -> None:
     ruff = str(get_venv_bin("ruff"))
 
     click.echo("Formatting code...")
-    run_command([ruff, "format", "src/", "tests/"])
-    run_command([ruff, "check", "--fix", "src/", "tests/"])
+    run_command([ruff, "format", SRC_DIR, TESTS_DIR])
+    run_command([ruff, "check", "--fix", SRC_DIR, TESTS_DIR])
     click.secho("✓ Code formatted!", fg="green")
 
 

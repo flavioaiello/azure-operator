@@ -4,13 +4,11 @@
 # ============================================================================
 FROM alpine:3.19
 
-RUN apk add --no-cache git openssh-client ca-certificates
-
-# Create non-root user
-RUN adduser -D -u 65534 gitsync
-
-# Create directories
-RUN mkdir -p /specs /ssh && chown -R gitsync:gitsync /specs /ssh
+# Install dependencies, create non-root user, and set up directories in single layer
+RUN apk add --no-cache git openssh-client ca-certificates && \
+    adduser -D -u 65534 gitsync && \
+    mkdir -p /specs /ssh && \
+    chown -R gitsync:gitsync /specs /ssh
 
 USER gitsync
 

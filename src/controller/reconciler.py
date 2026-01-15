@@ -755,7 +755,7 @@ class Reconciler:
             if scope_value:
                 await self._guardrails.acquire_scope_lock(scope_type, scope_value)
                 # Check Azure for any in-progress external deployments
-                await self._guardrails.check_active_deployments_azure(
+                self._guardrails.check_active_deployments_azure(
                     client=self._client,
                     scope_type=scope_type,
                     scope_value=scope_value,

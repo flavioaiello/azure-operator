@@ -22,10 +22,6 @@ on:
     # Run daily at 06:00 UTC to catch newly disclosed vulnerabilities
     - cron: '0 6 * * *'
 
-permissions:
-  contents: read
-  security-events: write  # For uploading SARIF results
-
 env:
   PYTHON_VERSION: "3.11"
 
@@ -33,6 +29,8 @@ jobs:
   dependency-audit:
     name: Dependency Vulnerability Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Required for checkout
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -70,6 +68,9 @@ jobs:
   trivy-scan:
     name: Trivy Vulnerability Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Required for checkout
+      security-events: write  # Required for SARIF upload to GitHub Security
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -96,6 +97,8 @@ jobs:
   static-analysis:
     name: Static Analysis & Type Checking
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Required for checkout
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -125,6 +128,8 @@ jobs:
   bicep-validation:
     name: Bicep/ARM Template Security
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Required for checkout
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -161,6 +166,8 @@ jobs:
   secret-scanning:
     name: Secret Detection
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Required for checkout with full history
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -177,6 +184,8 @@ jobs:
   tests:
     name: Security-Focused Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Required for checkout
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -204,6 +213,7 @@ jobs:
   security-gate:
     name: Security Gate
     runs-on: ubuntu-latest
+    permissions: {}  # No permissions needed - just checks other job results
     needs: [dependency-audit, trivy-scan, static-analysis, bicep-validation, secret-scanning, tests]
     if: always()
     steps:

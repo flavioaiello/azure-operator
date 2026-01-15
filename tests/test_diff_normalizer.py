@@ -232,7 +232,7 @@ class TestDiffNormalizerNumericString:
         result = normalizer.normalize_value(
             "3.14", "Microsoft.Network/firewalls", "properties.rules.port"
         )
-        assert result == 3.14
+        assert isinstance(result, float) and abs(result - 3.14) < 1e-9
 
 
 class TestDiffNormalizerUrl:

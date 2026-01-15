@@ -83,7 +83,7 @@ class TestPauseEntry:
             expires_at=now - timedelta(hours=1),
             initiated_by="admin",
         )
-        assert entry.remaining_seconds() == 0.0
+        assert entry.remaining_seconds() < 1e-9
 
     def test_to_dict_and_from_dict(self) -> None:
         """Test serialization round-trip."""

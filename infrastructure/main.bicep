@@ -490,9 +490,6 @@ resource operatorContainers 'Microsoft.ContainerInstance/containerGroups@2023-05
         }
       }
     }
-    dependsOn: [
-      operatorIdentities
-    ]
   }
 ]
 

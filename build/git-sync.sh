@@ -25,7 +25,9 @@ fi
 CLONE_DIR="/tmp/repo"
 
 log() {
-    echo "[$(date -Iseconds)] $1"
+    local message="$1"
+    echo "[$(date -Iseconds)] $message"
+    return 0
 }
 
 sync_repo() {
@@ -49,6 +51,7 @@ sync_repo() {
     fi
 
     log "Sync complete"
+    return 0
 }
 
 # Initial sync

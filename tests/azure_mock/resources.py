@@ -326,7 +326,7 @@ class MockResourceState:
     def compute_whatif(
         self,
         template: dict[str, Any],
-        parameters: dict[str, Any],  # noqa: ARG002 - kept for API compatibility
+        parameters: dict[str, Any],
         subscription_id: str,
         resource_group: str | None = None,
         management_group_id: str | None = None,
@@ -337,7 +337,7 @@ class MockResourceState:
 
         Args:
             template: ARM template.
-            parameters: Template parameters.
+            parameters: Template parameters (reserved for future use).
             subscription_id: Target subscription.
             resource_group: Target resource group (for RG-scoped deployments).
             management_group_id: Target management group (for MG-scoped deployments).
@@ -345,6 +345,9 @@ class MockResourceState:
         Returns:
             WhatIfResult with detected changes.
         """
+        # Parameters kept for API compatibility with Azure SDK signature
+        _ = parameters
+
         changes: list[MockWhatIfChange] = []
 
         # Extract resources from template

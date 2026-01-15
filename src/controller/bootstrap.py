@@ -139,7 +139,7 @@ class BootstrapReconciler:
 
         try:
             # Ensure identity resource group exists
-            await self._ensure_resource_group(
+            self._ensure_resource_group(
                 self._spec.identity_resource_group,
                 self._spec.location or self._config.location,
             )
@@ -182,7 +182,7 @@ class BootstrapReconciler:
 
         return result
 
-    async def _ensure_resource_group(self, name: str, location: str) -> None:
+    def _ensure_resource_group(self, name: str, location: str) -> None:
         """Ensure resource group exists, create if not."""
         try:
             rg = ResourceGroup(

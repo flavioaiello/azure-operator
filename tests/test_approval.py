@@ -24,9 +24,6 @@ from controller.approval import (
     RiskAssessor,
 )
 
-if TYPE_CHECKING:
-    pass
-
 
 class TestConfidenceLevel:
     """Tests for ConfidenceLevel enum."""

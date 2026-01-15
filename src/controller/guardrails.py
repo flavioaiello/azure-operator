@@ -74,6 +74,9 @@ DEFAULT_DENIED_MANAGEMENT_GROUPS = [
     "Tenant Root Group",  # Never touch tenant root by default
 ]
 
+# Azure API filter for running deployments
+RUNNING_DEPLOYMENTS_FILTER = "provisioningState eq 'Running'"
+
 
 class ChangeCategory(str, Enum):
     """Categories of changes for rate limiting."""
@@ -747,7 +750,7 @@ class GuardrailEnforcer:
                     f"Set FAIL_CLOSED_ON_WHATIF_DEGRADATION=false to override."
                 )
 
-    async def check_active_deployments_azure(
+    def check_active_deployments_azure(
         self,
         client: Any,  # ResourceManagementClient
         scope_type: str,
@@ -782,17 +785,17 @@ class GuardrailEnforcer:
             # Note: This is a synchronous API wrapped in a thread
             if scope_type == "subscription":
                 deployments = client.deployments.list_at_subscription_scope(
-                    filter="provisioningState eq 'Running'"
+                    filter=RUNNING_DEPLOYMENTS_FILTER
                 )
             elif scope_type == "management_group":
                 deployments = client.deployments.list_at_management_group_scope(
                     group_id=scope_value,
-                    filter="provisioningState eq 'Running'",
+                    filter=RUNNING_DEPLOYMENTS_FILTER,
                 )
             elif scope_type == "resource_group":
                 deployments = client.deployments.list_by_resource_group(
                     resource_group_name=scope_value,
-                    filter="provisioningState eq 'Running'",
+                    filter=RUNNING_DEPLOYMENTS_FILTER,
                 )
             else:
                 logger.warning(

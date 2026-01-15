@@ -476,7 +476,8 @@ def create_mode_resolver_from_env(global_mode: ReconciliationMode) -> ModeResolv
             if isinstance(overrides_data, list):
                 for item in overrides_data:
                     global_overrides.append(ResourceModeOverride.model_validate(item))
-        except (json.JSONDecodeError, ValueError) as e:
+        except ValueError as e:
+            # ValueError covers json.JSONDecodeError (its subclass) and Pydantic validation errors
             logger.warning(f"Failed to parse GLOBAL_MODE_OVERRIDES: {e}")
 
     return ModeResolver(

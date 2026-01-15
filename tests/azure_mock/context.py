@@ -13,9 +13,6 @@ from unittest import mock
 from .credential import MockManagedIdentityCredential, create_mock_credential
 from .resources import MockResourceClient, MockResourceState
 
-if TYPE_CHECKING:
-    pass
-
 
 class MockAzureContext:
     """Context manager for Azure API mocking in integration tests.
