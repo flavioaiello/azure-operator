@@ -70,3 +70,7 @@ secrets/
 
 # Vendor (if using)
 vendor/
+
+# Go binaries
+/azo
+/operator
