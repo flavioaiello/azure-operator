@@ -20,6 +20,19 @@ A **Python-based, stateless operator framework** for continuously reconciling Az
 
 ---
 
+## Who Is This For?
+
+Deploying and maintaining an Azure Landing Zone is a significant undertaking with manual or pipeline-based approaches. The operator model is particularly well-suited for:
+
+- **Lab environments** — Spin up compliant landing zones quickly, let the operator maintain them
+- **Pre-production / Staging** — Mirror production topology with continuous drift correction
+- **Platform teams** — Reduce toil by automating the reconciliation loop
+- **Multi-tenant scenarios** — Per-domain isolation simplifies blast radius management
+
+> **Not recommended for:** Environments requiring change advisory board (CAB) approval for every modification. Use `RECONCILIATION_MODE=observe` for drift alerting without auto-remediation.
+
+---
+
 ## Why Operators Beat Pipelines
 
 **The core insight:** Landing zones aren't a one-time deployment — they're living infrastructure that drifts. Pipelines run when you remember to trigger them. Operators run continuously.
