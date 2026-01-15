@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+from azure_mock import (
+    MockGraphChange,
+    MockGraphResource,
+    create_mock_credential,
+    create_mock_graph_client,
+)
 
 from controller.config import Config, DeploymentScope
 from controller.resource_graph import (
@@ -15,13 +21,6 @@ from controller.resource_graph import (
     ResourceChange,
     ResourceGraphQuerier,
     ResourceInfo,
-)
-
-from azure_mock import (
-    MockGraphChange,
-    MockGraphResource,
-    create_mock_credential,
-    create_mock_graph_client,
 )
 
 
@@ -198,7 +197,10 @@ class TestResourceGraphQuerier:
     ) -> None:
         """Test getting change attribution for a specific resource."""
         credential = create_mock_credential()
-        resource_id = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet"
+        resource_id = (
+            "/subscriptions/sub/resourceGroups/rg/"
+            "providers/Microsoft.Network/virtualNetworks/vnet"
+        )
 
         # Add change for specific resource
         mock_graph_client.add_change(
@@ -229,8 +231,14 @@ class TestResourceGraphQuerier:
         credential = create_mock_credential()
 
         # Add resources - one expected, one orphan
-        expected_id = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/expected-vnet"
-        orphan_id = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/orphan-vnet"
+        expected_id = (
+            "/subscriptions/sub/resourceGroups/rg/"
+            "providers/Microsoft.Network/virtualNetworks/expected-vnet"
+        )
+        orphan_id = (
+            "/subscriptions/sub/resourceGroups/rg/"
+            "providers/Microsoft.Network/virtualNetworks/orphan-vnet"
+        )
 
         mock_graph_client.add_resource(
             MockGraphResource(
@@ -262,6 +270,8 @@ class TestResourceGraphQuerier:
         self, test_config: Config, mock_graph_client: MagicMock
     ) -> None:
         """Test handling of query timeout."""
+        from azure.core.exceptions import HttpResponseError
+
         credential = create_mock_credential()
 
         mock_graph_client.set_should_fail(True, "Query timed out")
@@ -272,7 +282,7 @@ class TestResourceGraphQuerier:
         ):
             querier = ResourceGraphQuerier(credential, test_config)
 
-            with pytest.raises(Exception):  # HttpResponseError
+            with pytest.raises(HttpResponseError):
                 await querier.check_for_changes()
 
     @pytest.mark.asyncio

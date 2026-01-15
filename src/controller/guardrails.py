@@ -21,7 +21,6 @@ import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +219,10 @@ class GuardrailEnforcer:
         if self._config.kill_switch_enabled or env_kill_switch:
             logger.warning(
                 "KILL_SWITCH: Apply operations blocked",
-                extra={"config_enabled": self._config.kill_switch_enabled, "env_enabled": env_kill_switch},
+                extra={
+                    "config_enabled": self._config.kill_switch_enabled,
+                    "env_enabled": env_kill_switch,
+                },
             )
             raise KillSwitchActive(
                 "Kill switch is active. All apply operations are blocked. "
@@ -283,22 +285,21 @@ class GuardrailEnforcer:
                 )
 
         # Check allowlist (if configured)
-        if self._config.allowed_management_groups:
-            if not any(
-                self._scope_matches(mg_name, allowed)
-                for allowed in self._config.allowed_management_groups
-            ):
-                logger.error(
-                    "GUARDRAIL: Management group not in allowlist",
-                    extra={
-                        "management_group": mg_name,
-                        "allowed": self._config.allowed_management_groups,
-                    },
-                )
-                raise ScopeViolation(
-                    f"Management group '{mg_name}' is not in the allowed list. "
-                    f"Add it to ALLOWED_MANAGEMENT_GROUPS to permit deployment."
-                )
+        if self._config.allowed_management_groups and not any(
+            self._scope_matches(mg_name, allowed)
+            for allowed in self._config.allowed_management_groups
+        ):
+            logger.error(
+                "GUARDRAIL: Management group not in allowlist",
+                extra={
+                    "management_group": mg_name,
+                    "allowed": self._config.allowed_management_groups,
+                },
+            )
+            raise ScopeViolation(
+                f"Management group '{mg_name}' is not in the allowed list. "
+                f"Add it to ALLOWED_MANAGEMENT_GROUPS to permit deployment."
+            )
 
     def _check_subscription_scope(self, subscription_id: str) -> None:
         """Check subscription scope.
@@ -321,21 +322,20 @@ class GuardrailEnforcer:
                 )
 
         # Check allowlist (if configured)
-        if self._config.allowed_subscriptions:
-            if not any(
-                self._scope_matches(subscription_id, allowed)
-                for allowed in self._config.allowed_subscriptions
-            ):
-                logger.error(
-                    "GUARDRAIL: Subscription not in allowlist",
-                    extra={
-                        "subscription_id": subscription_id,
-                        "allowed": self._config.allowed_subscriptions,
-                    },
-                )
-                raise ScopeViolation(
-                    f"Subscription '{subscription_id}' is not in the allowed list."
-                )
+        if self._config.allowed_subscriptions and not any(
+            self._scope_matches(subscription_id, allowed)
+            for allowed in self._config.allowed_subscriptions
+        ):
+            logger.error(
+                "GUARDRAIL: Subscription not in allowlist",
+                extra={
+                    "subscription_id": subscription_id,
+                    "allowed": self._config.allowed_subscriptions,
+                },
+            )
+            raise ScopeViolation(
+                f"Subscription '{subscription_id}' is not in the allowed list."
+            )
 
     def _check_resource_group_scope(self, rg_name: str) -> None:
         """Check resource group scope.
@@ -347,21 +347,20 @@ class GuardrailEnforcer:
             ScopeViolation: If RG is not allowed.
         """
         # Check allowlist (if configured)
-        if self._config.allowed_resource_groups:
-            if not any(
-                self._scope_matches(rg_name, allowed)
-                for allowed in self._config.allowed_resource_groups
-            ):
-                logger.error(
-                    "GUARDRAIL: Resource group not in allowlist",
-                    extra={
-                        "resource_group": rg_name,
-                        "allowed": self._config.allowed_resource_groups,
-                    },
-                )
-                raise ScopeViolation(
-                    f"Resource group '{rg_name}' is not in the allowed list."
-                )
+        if self._config.allowed_resource_groups and not any(
+            self._scope_matches(rg_name, allowed)
+            for allowed in self._config.allowed_resource_groups
+        ):
+            logger.error(
+                "GUARDRAIL: Resource group not in allowlist",
+                extra={
+                    "resource_group": rg_name,
+                    "allowed": self._config.allowed_resource_groups,
+                },
+            )
+            raise ScopeViolation(
+                f"Resource group '{rg_name}' is not in the allowed list."
+            )
 
     def _scope_matches(self, value: str, pattern: str) -> bool:
         """Check if scope value matches pattern.

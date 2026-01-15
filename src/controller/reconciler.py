@@ -436,7 +436,10 @@ class Reconciler:
             result.error = e
         except KillSwitchActive as e:
             # Kill switch is not an error - it's intentional blocking
-            logger.warning("Kill switch active, apply blocked", extra={"domain": self._config.domain})
+            logger.warning(
+                "Kill switch active, apply blocked",
+                extra={"domain": self._config.domain},
+            )
             result.error = e
         except ScopeViolation as e:
             logger.error("Scope guardrail violation", extra={"error": str(e)})

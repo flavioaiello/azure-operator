@@ -28,7 +28,12 @@ Usage:
 
 from .context import MockAzureContext
 from .credential import MockManagedIdentityCredential, create_mock_credential
-from .graph import MockGraphChange, MockGraphResource, MockResourceGraphClient, create_mock_graph_client
+from .graph import (
+    MockGraphChange,
+    MockGraphResource,
+    MockResourceGraphClient,
+    create_mock_graph_client,
+)
 from .resources import MockResourceClient, MockResourceState
 
 __all__ = [

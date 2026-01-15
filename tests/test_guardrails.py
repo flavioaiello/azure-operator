@@ -11,14 +11,14 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 from controller.guardrails import (
-    ChangeCategory,
     DEFAULT_DENIED_MANAGEMENT_GROUPS,
+    TENANT_ROOT_MG_NAMES,
+    ChangeCategory,
     GuardrailEnforcer,
     GuardrailsConfig,
     GuardrailViolation,
@@ -26,7 +26,6 @@ from controller.guardrails import (
     RateLimitState,
     RateLimitViolation,
     ScopeViolation,
-    TENANT_ROOT_MG_NAMES,
 )
 
 
