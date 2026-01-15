@@ -59,6 +59,7 @@ resource containerInsightsSolution 'Microsoft.OperationsManagement/solutions@201
     name: 'ContainerInsights(${logAnalyticsWorkspace.name})'
     publisher: 'Microsoft'
     product: 'OMSGallery/ContainerInsights'
+    // promotionCode is a required field for Marketplace solutions - empty string means no promo
     promotionCode: ''
   }
 }

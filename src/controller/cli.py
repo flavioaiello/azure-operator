@@ -281,7 +281,7 @@ def lint_bicep() -> None:
 
     for domain_dir in bicep_dir.iterdir():
         if domain_dir.is_dir():
-            main_bicep = domain_dir / "main.bicep"
+            main_bicep = domain_dir / MAIN_BICEP_FILENAME
             if main_bicep.exists():
                 click.echo(f"  {domain_dir.name}...")
                 run_command(
@@ -366,7 +366,7 @@ def build_templates() -> None:
 
     compiled = 0
     for domain in DOMAINS:
-        main_bicep = bicep_dir / domain / "main.bicep"
+        main_bicep = bicep_dir / domain / MAIN_BICEP_FILENAME
         if main_bicep.exists():
             output = templates_dir / f"{domain}.json"
             click.echo(f"  {domain} → {output.name}")
@@ -529,7 +529,7 @@ def deploy_infra(location: str) -> None:
             "--location",
             location,
             "--template-file",
-            str(root / "infrastructure" / "main.bicep"),
+            str(root / "infrastructure" / MAIN_BICEP_FILENAME),
             "--parameters",
             str(root / "infrastructure" / "main.bicepparam"),
         ],

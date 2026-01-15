@@ -80,6 +80,10 @@ param enablePrivateEndpoints bool = true
 
 var resourceGroupName = 'rg-${namePrefix}-${location}'
 
+// Placeholder for "not applicable" scope - used when operator targets subscription (not MG) or vice versa
+// SECURITY: Explicit empty value indicates this scope is intentionally unused
+var notApplicable = ''
+
 // Granular operators - one per concern for minimal blast radius
 // Each operator manages a single resource type with least-privilege RBAC
 var operators = [
@@ -89,7 +93,7 @@ var operators = [
     description: 'Azure Firewall and policies'
     scope: 'sub'
     subscriptionId: subscriptionIds.connectivity
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.5'
     memoryInGb: '1'
   }
@@ -98,7 +102,7 @@ var operators = [
     description: 'VPN Gateway and connections'
     scope: 'sub'
     subscriptionId: subscriptionIds.connectivity
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.25'
     memoryInGb: '0.5'
   }
@@ -107,7 +111,7 @@ var operators = [
     description: 'ExpressRoute Gateway and circuits'
     scope: 'sub'
     subscriptionId: subscriptionIds.connectivity
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.25'
     memoryInGb: '0.5'
   }
@@ -116,7 +120,7 @@ var operators = [
     description: 'Azure Bastion hosts'
     scope: 'sub'
     subscriptionId: subscriptionIds.connectivity
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.25'
     memoryInGb: '0.5'
   }
@@ -125,7 +129,7 @@ var operators = [
     description: 'Private DNS zones and resolver'
     scope: 'sub'
     subscriptionId: subscriptionIds.connectivity
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.25'
     memoryInGb: '0.5'
   }
@@ -134,7 +138,7 @@ var operators = [
     description: 'Hub VNet and peerings'
     scope: 'sub'
     subscriptionId: subscriptionIds.connectivity
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.5'
     memoryInGb: '1'
   }
@@ -144,7 +148,7 @@ var operators = [
     description: 'Log Analytics workspaces and solutions'
     scope: 'sub'
     subscriptionId: subscriptionIds.management
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.25'
     memoryInGb: '0.5'
   }
@@ -153,7 +157,7 @@ var operators = [
     description: 'Automation accounts and runbooks'
     scope: 'sub'
     subscriptionId: subscriptionIds.management
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.25'
     memoryInGb: '0.5'
   }
@@ -162,7 +166,7 @@ var operators = [
     description: 'Data collection rules and alerts'
     scope: 'sub'
     subscriptionId: subscriptionIds.management
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.25'
     memoryInGb: '0.5'
   }
@@ -172,7 +176,7 @@ var operators = [
     description: 'Defender for Cloud plans and settings'
     scope: 'sub'
     subscriptionId: subscriptionIds.security
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.25'
     memoryInGb: '0.5'
   }
@@ -181,7 +185,7 @@ var operators = [
     description: 'Key Vaults for platform secrets'
     scope: 'sub'
     subscriptionId: subscriptionIds.security
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.25'
     memoryInGb: '0.5'
   }
@@ -190,7 +194,7 @@ var operators = [
     description: 'Microsoft Sentinel workspace and rules'
     scope: 'sub'
     subscriptionId: subscriptionIds.security
-    managementGroupId: ''
+    managementGroupId: notApplicable
     cpu: '0.25'
     memoryInGb: '0.5'
   }
@@ -199,7 +203,7 @@ var operators = [
     name: 'management-group'
     description: 'Management group hierarchy'
     scope: 'mg'
-    subscriptionId: ''
+    subscriptionId: notApplicable
     managementGroupId: rootManagementGroupId
     cpu: '0.25'
     memoryInGb: '0.5'
@@ -208,7 +212,7 @@ var operators = [
     name: 'policy'
     description: 'Policy definitions and assignments'
     scope: 'mg'
-    subscriptionId: ''
+    subscriptionId: notApplicable
     managementGroupId: rootManagementGroupId
     cpu: '0.5'
     memoryInGb: '1'
@@ -217,7 +221,7 @@ var operators = [
     name: 'role'
     description: 'Custom roles and role assignments'
     scope: 'mg'
-    subscriptionId: ''
+    subscriptionId: notApplicable
     managementGroupId: rootManagementGroupId
     cpu: '0.25'
     memoryInGb: '0.5'

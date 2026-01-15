@@ -534,6 +534,18 @@
         "reconcileIntervalSeconds": "[parameters('reconcileInterval')]",
         "dryRunEnabled": "[parameters('dryRun')]"
       }
+    },
+    "configurationOptions": {
+      "type": "object",
+      "metadata": {
+        "description": "Configuration options reserved for future implementation"
+      },
+      "value": {
+        "rbacScope": "[parameters('rbacScope')]",
+        "managementGroupId": "[parameters('managementGroupId')]",
+        "operatorTopology": "[parameters('operatorTopology')]",
+        "gitAuthConfigured": "[and(not(empty(parameters('gitUsername'))), not(empty(parameters('gitToken'))))]"
+      }
     }
   }
 }
