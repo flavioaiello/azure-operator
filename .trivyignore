@@ -1,0 +1,33 @@
+# Trivy Vulnerability Ignore File
+#
+# This file documents vulnerabilities that have been analyzed and determined
+# to be false positives or not applicable to this project.
+#
+# SECURITY: Every entry MUST have a justification explaining why it's ignored.
+# Review this file periodically and remove entries when fixes are available.
+
+# =============================================================================
+# CVE-2023-45853 - zlib MiniZip integer overflow
+# =============================================================================
+# Package: zlib1g (1:1.2.13.dfsg-1)
+# Severity: CRITICAL
+# Status: FALSE POSITIVE
+#
+# JUSTIFICATION:
+# This CVE affects MiniZip (contrib/minizip), which is a SEPARATE component
+# that is NOT compiled into Debian's zlib1g binary package.
+#
+# Evidence from Debian Security Tracker:
+# - https://security-tracker.debian.org/tracker/CVE-2023-45853
+# - "[bookworm] - zlib <ignored> (contrib/minizip not built and src:zlib not
+#    producing binary packages)"
+#
+# The vulnerable code path (zipOpenNewFileInZip4_64) only exists in minizip,
+# which is built from src:minizip, not src:zlib. The zlib1g package in our
+# distroless base image does NOT contain this code.
+#
+# Debian's minizip package (src:minizip) IS patched: 1.1-8+deb12u1
+#
+# REVIEWED: 2026-01-15
+# REVIEWER: Security audit during v0.1.0 release
+CVE-2023-45853
