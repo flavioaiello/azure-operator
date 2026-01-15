@@ -1,8 +1,8 @@
 # Azure Landing Zone Operator
 
-> **Landing Zones, and Enterprise Runways.**
+> **A better operational model than "run pipelines occasionally."**
 >
-> *Continuous reconciliation. Secretless. GitOps-native. The operator pattern that cloud infrastructure deserves.*
+> *Continuous reconciliation. Per-domain identities. ACI isolation. The operator pattern that cloud infrastructure deserves.*
 
 A **Python-based, stateless operator framework** for continuously reconciling Azure Landing Zones. Inspired by Kubernetes controller patterns, designed for Azure's unique characteristics.
 
@@ -14,28 +14,39 @@ A **Python-based, stateless operator framework** for continuously reconciling Az
 [![Pydantic v2](https://img.shields.io/badge/pydantic-v2-E92063.svg)](https://docs.pydantic.dev/)
 [![Azure SDK](https://img.shields.io/badge/Azure%20SDK-Latest-0078D4.svg)](https://github.com/Azure/azure-sdk-for-python)
 [![Security: Secretless](https://img.shields.io/badge/security-secretless-brightgreen.svg)](#secretless-architecture-mandatory)
-[![Tests: 67 passing](https://img.shields.io/badge/tests-67%20passing-brightgreen.svg)](tests/)
+[![Tests: 150 passing](https://img.shields.io/badge/tests-150%20passing-brightgreen.svg)](tests/)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-flavioaiello%2Fazure--operator-blue.svg?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNNCAxOWg0djJINHoiLz48cGF0aCBkPSJNMTAgMTloNHYyaC00eiIvPjxwYXRoIGQ9Ik0xNiAxOWg0djJoLTR6Ii8+PHBhdGggZD0iTTQgMTFoMTZ2Mkg0eiIvPjxwYXRoIGQ9Ik00IDNoMTZ2Mkg0eiIvPjxwYXRoIGQ9Ik04IDN2MTYiLz48cGF0aCBkPSJNMTYgM3YxNiIvPjwvc3ZnPg==)](https://deepwiki.com/flavioaiello/azure-operator)
 
+---
 
+## Why Operators Beat Pipelines
 
-## Why an Operator Framework?
+**The core insight:** Landing zones aren't a one-time deployment — they're living infrastructure that drifts. Pipelines run when you remember to trigger them. Operators run continuously.
 
-Traditional Azure Landing Zone deployments suffer from:
+| Pipeline Model | Operator Model |
+|----------------|----------------|
+| Run occasionally, hope nothing drifted | **Continuous reconciliation** — drift detected and corrected automatically |
+| Single pipeline identity with broad permissions | **Per-domain identities** — each operator has least-privilege RBAC for its concern only |
+| Shared runners, shared blast radius | **ACI isolation** — each operator runs in its own container, failures don't cascade |
+| Terraform state files introduce drift risk | **ARM is the source of truth** — no external state to corrupt or conflict |
+| Manual intervention to detect drift | **GitOps-native** — desired state in Git, actual state in Azure, reconciled continuously |
 
-| Problem | Impact |
-|---------|--------|
-| **One-off bootstrapping** | Infrastructure drifts from desired state over time |
-| **Terraform state files** | External state introduces drift risk and lock contention |
-| **Monolithic deployments** | All concerns coupled, single failure breaks everything |
-| **Manual reconciliation** | Drift detection requires human intervention |
+### The Three Pillars
 
-The **Azure Operator Framework** solves these by:
+1. **Continuous Reconciliation**
+   - Every operator runs a control loop: detect drift → plan changes → apply (or alert)
+   - Hybrid detection: Resource Graph for fast-path (~2s), WhatIf for authoritative diff
+   - Circuit breaker pattern prevents runaway remediation
 
-- **Continuous reconciliation** — Desired state is constantly compared to actual state
-- **ARM as the source of truth** — No external state files, Azure IS the state
-- **Separation of concerns** — Each domain operates independently
-- **Loose coupling** — Operators don't depend on each other, reducing blast radius
+2. **Per-Domain Identities**
+   - 19 operators, 19 distinct managed identities
+   - Firewall operator can't touch DNS. DNS operator can't touch RBAC.
+   - Compromise of one operator doesn't compromise the landing zone
+
+3. **ACI Isolation**
+   - Each operator is a separate container instance
+   - No shared runtime, no shared secrets, no shared failure modes
+   - Private VNet deployment — no public IP addresses
 
 ---
 

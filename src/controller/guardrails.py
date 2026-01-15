@@ -15,12 +15,14 @@ by enforcing organizational policy at the operator level.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,18 @@ class RateLimitViolation(GuardrailViolation):
 
 class KillSwitchActive(GuardrailViolation):
     """Raised when kill switch is enabled."""
+
+    pass
+
+
+class ConcurrencyViolation(GuardrailViolation):
+    """Raised when concurrent deployment limit is exceeded."""
+
+    pass
+
+
+class ScopePauseViolation(GuardrailViolation):
+    """Raised when a scope is paused."""
 
     pass
 
@@ -103,6 +117,11 @@ class GuardrailsConfig:
     )
     denied_subscriptions: list[str] = field(default_factory=list)
 
+    # Paused scopes - temporarily block apply without denying
+    # Format: "subscription:<id>" or "management_group:<name>" or "domain:<name>"
+    # Pause is advisory - it blocks apply but allows drift detection (observe mode)
+    paused_scopes: list[str] = field(default_factory=list)
+
     # Rate limits per reconciliation interval
     max_rbac_changes_per_interval: int = 10
     max_policy_changes_per_interval: int = 5
@@ -119,6 +138,14 @@ class GuardrailsConfig:
     fail_closed_on_whatif_degradation: bool = True
     max_whatif_ignore_count: int = 10
 
+    # Concurrency control
+    # Max concurrent deployments per scope (subscription/MG)
+    max_concurrent_deployments_per_scope: int = 1
+    # Lock timeout for acquiring scope lock (seconds)
+    scope_lock_timeout_seconds: int = 30
+    # Check for active Azure deployments before starting new one
+    check_active_deployments: bool = True
+
     @classmethod
     def from_env(cls) -> GuardrailsConfig:
         """Load guardrails configuration from environment.
@@ -128,12 +155,16 @@ class GuardrailsConfig:
             ALLOWED_MANAGEMENT_GROUPS: Comma-separated list of allowed MGs
             DENIED_MANAGEMENT_GROUPS: Comma-separated list of denied MGs
             ALLOWED_SUBSCRIPTIONS: Comma-separated list of allowed subscription IDs
+            PAUSED_SCOPES: Comma-separated pause scopes (e.g., "domain:firewall")
             MAX_RBAC_CHANGES: Max RBAC changes per interval (default: 10)
             MAX_POLICY_CHANGES: Max policy changes per interval (default: 5)
             MAX_RESOURCE_CHANGES: Max resource changes per interval (default: 50)
             RATE_LIMIT_COOLDOWN: Cooldown seconds after hitting limit (default: 3600)
             FAIL_CLOSED_ON_WHATIF_DEGRADATION: If "true", fail when WhatIf unreliable
             MAX_WHATIF_IGNORE_COUNT: Max Ignore results before failing (default: 10)
+            MAX_CONCURRENT_DEPLOYMENTS_PER_SCOPE: Max concurrent deployments (default: 1)
+            SCOPE_LOCK_TIMEOUT: Lock acquisition timeout in seconds (default: 30)
+            CHECK_ACTIVE_DEPLOYMENTS: Check Azure for in-progress deployments (default: true)
         """
 
         def get_list(key: str) -> list[str]:
@@ -170,6 +201,7 @@ class GuardrailsConfig:
             allowed_resource_groups=get_list("ALLOWED_RESOURCE_GROUPS"),
             denied_management_groups=denied_mgs,
             denied_subscriptions=get_list("DENIED_SUBSCRIPTIONS"),
+            paused_scopes=get_list("PAUSED_SCOPES"),
             max_rbac_changes_per_interval=get_int("MAX_RBAC_CHANGES", 10),
             max_policy_changes_per_interval=get_int("MAX_POLICY_CHANGES", 5),
             max_resource_changes_per_interval=get_int("MAX_RESOURCE_CHANGES", 50),
@@ -177,6 +209,9 @@ class GuardrailsConfig:
             kill_switch_enabled=get_bool("KILL_SWITCH", False),
             fail_closed_on_whatif_degradation=get_bool("FAIL_CLOSED_ON_WHATIF_DEGRADATION", True),
             max_whatif_ignore_count=get_int("MAX_WHATIF_IGNORE_COUNT", 10),
+            max_concurrent_deployments_per_scope=get_int("MAX_CONCURRENT_DEPLOYMENTS_PER_SCOPE", 1),
+            scope_lock_timeout_seconds=get_int("SCOPE_LOCK_TIMEOUT", 30),
+            check_active_deployments=get_bool("CHECK_ACTIVE_DEPLOYMENTS", True),
         )
 
 
@@ -201,11 +236,109 @@ class GuardrailEnforcer:
         """
         self._config = config
         self._rate_limit_state = RateLimitState()
+        # Scope locks for concurrency control
+        # Key: scope_key (e.g., "subscription:xxx" or "management_group:yyy")
+        # Value: (lock, active_count)
+        self._scope_locks: dict[str, asyncio.Lock] = {}
+        self._scope_active_deployments: dict[str, int] = {}
 
     @property
     def config(self) -> GuardrailsConfig:
         """Get the guardrails configuration."""
         return self._config
+
+    def _get_scope_key(self, scope_type: str, scope_value: str) -> str:
+        """Build consistent scope key for lock management."""
+        return f"{scope_type}:{scope_value}"
+
+    async def acquire_scope_lock(
+        self, scope_type: str, scope_value: str
+    ) -> bool:
+        """Acquire deployment lock for a scope.
+
+        This prevents concurrent deployments to the same scope from this operator.
+        For distributed locking across multiple operator instances, use Azure
+        Blob lease or similar distributed lock mechanism.
+
+        Args:
+            scope_type: Scope type (subscription, management_group, resource_group)
+            scope_value: Scope identifier
+
+        Returns:
+            True if lock acquired, False if would exceed max concurrent
+
+        Raises:
+            ConcurrencyViolation: If max concurrent deployments exceeded
+        """
+        scope_key = self._get_scope_key(scope_type, scope_value)
+
+        # Create lock if needed
+        if scope_key not in self._scope_locks:
+            self._scope_locks[scope_key] = asyncio.Lock()
+            self._scope_active_deployments[scope_key] = 0
+
+        # Try to acquire with timeout
+        lock = self._scope_locks[scope_key]
+        try:
+            acquired = await asyncio.wait_for(
+                lock.acquire(),
+                timeout=self._config.scope_lock_timeout_seconds,
+            )
+            if not acquired:
+                raise ConcurrencyViolation(
+                    f"Timeout acquiring deployment lock for scope {scope_key}"
+                )
+
+            # Check if we'd exceed max concurrent
+            current = self._scope_active_deployments.get(scope_key, 0)
+            max_concurrent = self._config.max_concurrent_deployments_per_scope
+            if current >= max_concurrent:
+                lock.release()
+                raise ConcurrencyViolation(
+                    f"Max concurrent deployments ({max_concurrent}) "
+                    f"exceeded for scope {scope_key}"
+                )
+
+            # Increment active count
+            self._scope_active_deployments[scope_key] = current + 1
+            logger.info(
+                "Acquired deployment lock",
+                extra={
+                    "scope_key": scope_key,
+                    "active_deployments": self._scope_active_deployments[scope_key],
+                },
+            )
+            return True
+
+        except TimeoutError as e:
+            raise ConcurrencyViolation(
+                f"Timeout acquiring deployment lock for scope {scope_key}"
+            ) from e
+        finally:
+            # Always release the asyncio lock - we track concurrency separately
+            if lock.locked():
+                lock.release()
+
+    def release_scope_lock(self, scope_type: str, scope_value: str) -> None:
+        """Release deployment lock for a scope.
+
+        Args:
+            scope_type: Scope type (subscription, management_group, resource_group)
+            scope_value: Scope identifier
+        """
+        scope_key = self._get_scope_key(scope_type, scope_value)
+
+        if scope_key in self._scope_active_deployments:
+            current = self._scope_active_deployments.get(scope_key, 0)
+            if current > 0:
+                self._scope_active_deployments[scope_key] = current - 1
+                logger.info(
+                    "Released deployment lock",
+                    extra={
+                        "scope_key": scope_key,
+                        "active_deployments": self._scope_active_deployments[scope_key],
+                    },
+                )
 
     def check_kill_switch(self) -> None:
         """Check if kill switch is active.
@@ -228,6 +361,84 @@ class GuardrailEnforcer:
                 "Kill switch is active. All apply operations are blocked. "
                 "Set KILL_SWITCH=false to resume."
             )
+
+    def check_pause(
+        self,
+        domain: str,
+        scope_type: str,
+        scope_value: str,
+    ) -> None:
+        """Check if a scope or domain is paused.
+
+        Pause is less severe than kill switch - it blocks apply for specific
+        scopes/domains while allowing others to continue. Useful for:
+        - Maintenance windows for specific operators
+        - Temporarily halting RBAC changes while allowing network changes
+        - Emergency stop for one domain without affecting others
+
+        Args:
+            domain: The operator domain (e.g., "firewall", "dns")
+            scope_type: One of "management_group", "subscription", "resource_group"
+            scope_value: The scope identifier
+
+        Raises:
+            ScopePauseViolation: If scope or domain is paused.
+        """
+        # Also check environment for dynamic pause (format: type:value)
+        env_paused = os.environ.get("PAUSED_SCOPES", "")
+        paused_scopes = list(self._config.paused_scopes)
+        if env_paused:
+            paused_scopes.extend([s.strip() for s in env_paused.split(",") if s.strip()])
+
+        for paused in paused_scopes:
+            # Parse pause format: "type:value"
+            if ":" not in paused:
+                continue
+
+            pause_type, pause_value = paused.split(":", 1)
+            pause_type = pause_type.lower().strip()
+            pause_value = pause_value.strip()
+
+            # Check domain pause
+            if pause_type == "domain" and domain.lower() == pause_value.lower():
+                logger.warning(
+                    "PAUSE: Domain is paused, apply blocked",
+                    extra={"domain": domain, "pause_rule": paused},
+                )
+                raise ScopePauseViolation(
+                    f"Domain '{domain}' is paused. Apply operations are blocked. "
+                    f"Remove from PAUSED_SCOPES to resume."
+                )
+
+            # Check subscription pause
+            if (
+                pause_type == "subscription"
+                and scope_type == "subscription"
+                and scope_value.lower() == pause_value.lower()
+            ):
+                logger.warning(
+                    "PAUSE: Subscription is paused, apply blocked",
+                    extra={"subscription": scope_value, "pause_rule": paused},
+                )
+                raise ScopePauseViolation(
+                    f"Subscription '{scope_value}' is paused. Apply operations are blocked. "
+                    f"Remove from PAUSED_SCOPES to resume."
+                )
+
+            # Check management group pause
+            if (
+                pause_type == "management_group"
+                and scope_type == "management_group"
+                and scope_value.lower() == pause_value.lower()
+            ):
+                logger.warning(
+                    "PAUSE: Management group is paused, apply blocked",
+                    extra={"management_group": scope_value, "pause_rule": paused},
+                )
+                raise ScopePauseViolation(
+                    f"Management group '{scope_value}' is paused. Apply operations blocked. "
+                    f"Remove from PAUSED_SCOPES to resume."
+                )
 
     def check_scope(
         self,
@@ -535,3 +746,93 @@ class GuardrailEnforcer:
                     f"template expansion limits or timeouts. Deployment blocked for safety. "
                     f"Set FAIL_CLOSED_ON_WHATIF_DEGRADATION=false to override."
                 )
+
+    async def check_active_deployments_azure(
+        self,
+        client: Any,  # ResourceManagementClient
+        scope_type: str,
+        scope_value: str,
+        our_deployment_prefix: str = "azure-operator",
+    ) -> list[str]:
+        """Check for active deployments in Azure.
+
+        Queries Azure Resource Manager for any deployments currently in
+        "Running" state at the specified scope. This helps avoid conflicts
+        with deployments from other sources (pipelines, manual, other operators).
+
+        Args:
+            client: ResourceManagementClient instance
+            scope_type: Scope type (subscription, management_group, resource_group)
+            scope_value: Scope identifier
+            our_deployment_prefix: Prefix for our deployments (to exclude self)
+
+        Returns:
+            List of active deployment names (excluding our own)
+
+        Raises:
+            ConcurrencyViolation: If active deployments would block us
+        """
+        if not self._config.check_active_deployments:
+            return []
+
+        active_deployments: list[str] = []
+
+        try:
+            # Query for running deployments at this scope
+            # Note: This is a synchronous API wrapped in a thread
+            if scope_type == "subscription":
+                deployments = client.deployments.list_at_subscription_scope(
+                    filter="provisioningState eq 'Running'"
+                )
+            elif scope_type == "management_group":
+                deployments = client.deployments.list_at_management_group_scope(
+                    group_id=scope_value,
+                    filter="provisioningState eq 'Running'",
+                )
+            elif scope_type == "resource_group":
+                deployments = client.deployments.list_by_resource_group(
+                    resource_group_name=scope_value,
+                    filter="provisioningState eq 'Running'",
+                )
+            else:
+                logger.warning(
+                    "Unknown scope type for deployment check",
+                    extra={"scope_type": scope_type},
+                )
+                return []
+
+            # Collect active deployments, excluding our own
+            for deployment in deployments:
+                name = deployment.name or ""
+                # Skip our own deployments
+                if name.startswith(our_deployment_prefix):
+                    continue
+                active_deployments.append(name)
+
+            if active_deployments:
+                logger.warning(
+                    "Active external deployments detected",
+                    extra={
+                        "scope_type": scope_type,
+                        "scope_value": scope_value,
+                        "active_count": len(active_deployments),
+                        "deployments": active_deployments[:5],  # Cap for logging
+                    },
+                )
+                raise ConcurrencyViolation(
+                    f"Found {len(active_deployments)} active external deployment(s) at "
+                    f"{scope_type}:{scope_value}: {', '.join(active_deployments[:3])}. "
+                    f"Wait for completion or set CHECK_ACTIVE_DEPLOYMENTS=false."
+                )
+
+        except ConcurrencyViolation:
+            # Re-raise our own exception
+            raise
+        except Exception as e:
+            # Log but don't fail - this is advisory
+            logger.warning(
+                "Failed to check active deployments",
+                extra={"scope_type": scope_type, "error": str(e)},
+            )
+
+        return active_deployments

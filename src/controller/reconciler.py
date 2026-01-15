@@ -54,14 +54,22 @@ from .config import (
     RETRY_BACKOFF_BASE_SECONDS,
     Config,
     DeploymentScope,
+    ReconciliationMode,
 )
 from .guardrails import (
+    ConcurrencyViolation,
     GuardrailEnforcer,
     GuardrailsConfig,
     GuardrailViolation,
     KillSwitchActive,
     RateLimitViolation,
+    ScopePauseViolation,
     ScopeViolation,
+)
+from .ignore_rules import IgnoreRulesConfig, IgnoreRulesEvaluator
+from .provenance import (
+    ChangeProvenanceSummary,
+    get_provenance_logger,
 )
 from .resource_graph import GraphQueryResult, ResourceChange, ResourceGraphQuerier
 from .security import get_managed_identity_credential
@@ -89,15 +97,27 @@ class ChangeType(str, Enum):
     UNSUPPORTED = "Unsupported"
 
 
+class _EarlyReturnSignal(Exception):
+    """Internal signal for early returns that should still log provenance.
+
+    This is used to break out of the try block while still executing
+    the provenance logging code. Not a real error.
+    """
+
+    pass
+
+
 @dataclass
 class ReconcileResult:
     """Result of a single reconciliation cycle."""
 
     domain: str
+    mode: ReconciliationMode = ReconciliationMode.OBSERVE
     start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
     end_time: datetime | None = None
     drift_found: bool = False
     changes_applied: int = 0
+    changes_blocked: int = 0  # For PROTECT mode: drift detected but blocked
     error: Exception | None = None
 
     @property
@@ -166,6 +186,9 @@ class Reconciler:
         # Enforces kill switch, scope allowlists, and rate limits
         self._guardrails = GuardrailEnforcer(GuardrailsConfig.from_env())
 
+        # Ignore rules for filtering WhatIf noise
+        self._ignore_rules = IgnoreRulesEvaluator(IgnoreRulesConfig.from_env())
+
         self._shutdown_event = asyncio.Event()
 
         # Circuit breaker state
@@ -192,6 +215,7 @@ class Reconciler:
             extra={
                 "domain": self._config.domain,
                 "scope": self._config.scope.value,
+                "mode": self._config.mode.value,
                 "interval_seconds": self._config.reconcile_interval_seconds,
                 "dry_run": self._config.dry_run,
             },
@@ -278,29 +302,46 @@ class Reconciler:
 
         Raises:
             ScopeViolation: If the scope is denied or not in allowlist.
+            ScopePauseViolation: If the scope or domain is paused.
         """
         # Import here to avoid circular import
-        from .config import DeploymentScope
+
+        scope_type, scope_value = self._get_scope_for_guardrails()
+
+        if scope_value:
+            self._guardrails.check_scope(scope_type, scope_value)
+
+        # Check if domain or scope is paused (less severe than kill switch)
+        if scope_value:
+            self._guardrails.check_pause(
+                domain=self._config.domain,
+                scope_type=scope_type,
+                scope_value=scope_value,
+            )
+
+    def _get_scope_for_guardrails(self) -> tuple[str, str]:
+        """Get scope type and value for guardrail checks.
+
+        Returns:
+            Tuple of (scope_type, scope_value)
+        """
+        scope_type = ""
+        scope_value = ""
 
         match self._config.scope:
             case DeploymentScope.MANAGEMENT_GROUP:
                 if self._config.management_group_id:
-                    self._guardrails.check_scope(
-                        "management_group", self._config.management_group_id
-                    )
+                    scope_type = "management_group"
+                    scope_value = self._config.management_group_id
             case DeploymentScope.SUBSCRIPTION:
-                self._guardrails.check_scope(
-                    "subscription", self._config.subscription_id
-                )
+                scope_type = "subscription"
+                scope_value = self._config.subscription_id
             case DeploymentScope.RESOURCE_GROUP:
-                # Resource group scope requires subscription check too
-                self._guardrails.check_scope(
-                    "subscription", self._config.subscription_id
-                )
-                if self._config.resource_group_name:
-                    # Resource groups use subscription guardrails
-                    # No separate resource group allowlist needed currently
-                    pass
+                # Resource group scope uses subscription for guardrails
+                scope_type = "subscription"
+                scope_value = self._config.subscription_id
+
+        return scope_type, scope_value
 
     async def _reconcile_once(self) -> ReconcileResult:
         """Execute a single reconciliation cycle.
@@ -314,8 +355,19 @@ class Reconciler:
         Returns:
             ReconcileResult with details of the operation.
         """
-        result = ReconcileResult(domain=self._config.domain)
+        result = ReconcileResult(domain=self._config.domain, mode=self._config.mode)
         graph_result: GraphQueryResult | None = None
+
+        # PROVENANCE: Initialize provenance record for audit trail
+        provenance_logger = get_provenance_logger()
+        provenance = provenance_logger.create_provenance(
+            domain=self._config.domain,
+            subscription_id=self._config.subscription_id,
+            management_group_id=self._config.management_group_id,
+            deployment_scope=self._config.scope.value,
+            mode=self._config.mode.value,
+        )
+        change_summary = ChangeProvenanceSummary()
 
         try:
             # GUARDRAIL: Check kill switch before any operations
@@ -357,21 +409,22 @@ class Reconciler:
             # If Graph check passed with no changes, skip expensive WhatIf
             if skip_whatif:
                 result.drift_found = False
+                # Early exit - provenance is logged after the try/except block
                 result.end_time = datetime.now(UTC)
-                return result
+                # Don't return early - let the code flow to provenance logging
+                raise _EarlyReturnSignal()
 
             # PRECISE CHECK: Detect drift using ARM WhatIf
             changes = await self._detect_drift(params)
-            significant_changes = self._filter_significant_changes(changes)
+            significant_changes = self._filter_significant_changes(changes, change_summary)
 
             if not significant_changes:
                 logger.info("No drift detected", extra={"domain": self._config.domain})
                 result.drift_found = False
                 result.end_time = datetime.now(UTC)
-                return result
+                raise _EarlyReturnSignal()
 
             result.drift_found = True
-            result.changes_applied = len(significant_changes)
 
             # SECURITY: Enforce max resources limit to prevent runaway deployments
             if len(significant_changes) > self._config.security.max_resources_per_deployment:
@@ -390,12 +443,13 @@ class Reconciler:
                 )
                 result.error = RuntimeError(error_msg)
                 result.end_time = datetime.now(UTC)
-                return result
+                raise _EarlyReturnSignal()
 
             logger.info(
                 "Drift detected",
                 extra={
                     "domain": self._config.domain,
+                    "mode": self._config.mode.value,
                     "change_count": len(significant_changes),
                 },
             )
@@ -409,16 +463,81 @@ class Reconciler:
                     },
                 )
 
+            # RECONCILIATION MODE: Handle based on configured mode
+            match self._config.mode:
+                case ReconciliationMode.OBSERVE:
+                    # Report only - never apply changes
+                    logger.info(
+                        "OBSERVE mode: drift reported but not remediated",
+                        extra={
+                            "domain": self._config.domain,
+                            "change_count": len(significant_changes),
+                        },
+                    )
+                    result.changes_applied = 0
+                    result.end_time = datetime.now(UTC)
+                    raise _EarlyReturnSignal()
+
+                case ReconciliationMode.PROTECT:
+                    # Block changes - drift is a violation
+                    logger.warning(
+                        "PROTECT mode: drift detected, changes blocked",
+                        extra={
+                            "domain": self._config.domain,
+                            "change_count": len(significant_changes),
+                        },
+                    )
+                    result.changes_blocked = len(significant_changes)
+                    result.changes_applied = 0
+                    # Report but don't error - PROTECT is intentional blocking
+                    result.end_time = datetime.now(UTC)
+                    raise _EarlyReturnSignal()
+
+                case ReconciliationMode.ENFORCE:
+                    # Auto-remediate drift
+                    logger.info(
+                        "ENFORCE mode: applying drift remediation",
+                        extra={
+                            "domain": self._config.domain,
+                            "change_count": len(significant_changes),
+                        },
+                    )
+
+            # Legacy dry_run support (deprecated, use OBSERVE mode)
             if self._config.dry_run:
-                logger.info("Dry-run mode, skipping apply", extra={"domain": self._config.domain})
+                logger.info(
+                    "Dry-run mode (deprecated), skipping apply",
+                    extra={"domain": self._config.domain},
+                )
+                result.changes_applied = 0
                 result.end_time = datetime.now(UTC)
-                return result
+                raise _EarlyReturnSignal()
 
             # GUARDRAIL: Check rate limits before apply
             self._guardrails.check_rate_limit(resource_changes=len(significant_changes))
 
-            # Apply changes with retry logic
-            await self._apply_with_retry(params)
+            # CONCURRENCY: Acquire scope lock and check for active deployments
+            scope_type, scope_value = self._get_scope_for_guardrails()
+            if scope_value:
+                await self._guardrails.acquire_scope_lock(scope_type, scope_value)
+                # Check Azure for any in-progress external deployments
+                await self._guardrails.check_active_deployments_azure(
+                    client=self._client,
+                    scope_type=scope_type,
+                    scope_value=scope_value,
+                    our_deployment_prefix=DEPLOYMENT_NAME_PREFIX,
+                )
+
+            try:
+                # Apply changes with retry logic
+                await self._apply_with_retry(params)
+
+                # Record actual applied count
+                result.changes_applied = len(significant_changes)
+            finally:
+                # CONCURRENCY: Always release scope lock
+                if scope_value:
+                    self._guardrails.release_scope_lock(scope_type, scope_value)
 
             # GUARDRAIL: Record changes for rate limiting
             self._guardrails.record_changes(resource_changes=len(significant_changes))
@@ -431,14 +550,31 @@ class Reconciler:
                 },
             )
 
+        except _EarlyReturnSignal:
+            # Normal control flow - not an error, just early exit
+            pass
         except SpecLoadError as e:
             logger.error("Failed to load spec", extra={"error": str(e)})
+            result.error = e
+        except ConcurrencyViolation as e:
+            # Concurrency violation - another deployment is in progress
+            logger.warning(
+                "Concurrency violation, deployment skipped",
+                extra={"domain": self._config.domain, "reason": str(e)},
+            )
             result.error = e
         except KillSwitchActive as e:
             # Kill switch is not an error - it's intentional blocking
             logger.warning(
                 "Kill switch active, apply blocked",
                 extra={"domain": self._config.domain},
+            )
+            result.error = e
+        except ScopePauseViolation as e:
+            # Pause is not an error - it's intentional per-scope blocking
+            logger.warning(
+                "Scope/domain paused, apply blocked",
+                extra={"domain": self._config.domain, "pause_reason": str(e)},
             )
             result.error = e
         except ScopeViolation as e:
@@ -463,7 +599,20 @@ class Reconciler:
             logger.exception("Unexpected error during reconciliation")
             result.error = e
 
-        result.end_time = datetime.now(UTC)
+        if result.end_time is None:
+            result.end_time = datetime.now(UTC)
+
+        # PROVENANCE: Complete and log the provenance record
+        provenance.drift_detected = result.drift_found
+        provenance.changes_applied = result.changes_applied
+        provenance.changes_blocked = result.changes_blocked
+        provenance.change_summary = change_summary
+        provenance.duration_seconds = result.duration_seconds
+        if result.error:
+            provenance.error = str(result.error)
+            provenance.error_type = type(result.error).__name__
+        provenance_logger.log_provenance(provenance)
+
         return result
 
     async def _detect_drift(self, params: dict[str, Any]) -> list[WhatIfChange]:
@@ -771,36 +920,82 @@ class Reconciler:
             operation_name="Deployment (resource group)",
         )
 
-    def _filter_significant_changes(self, changes: list[WhatIfChange]) -> list[WhatIfChange]:
+    def _filter_significant_changes(
+        self, changes: list[WhatIfChange], change_summary: ChangeProvenanceSummary | None = None
+    ) -> list[WhatIfChange]:
         """Filter out non-significant changes.
+
+        Applies two levels of filtering:
+        1. Remove ARM WhatIf noise (NoChange, Ignore types)
+        2. Apply ignore rules for known system-managed properties
+
+        Optionally updates a ChangeProvenanceSummary with counts by type.
 
         Args:
             changes: Raw WhatIf changes.
+            change_summary: Optional summary to update with change counts.
 
         Returns:
             List of changes that require action.
         """
-        significant = []
+        # First pass: remove ARM-level noise and count by type
+        preliminary = []
         for change in changes:
-            if change.change_type not in (
+            change_type = change.change_type
+
+            # Update provenance summary with counts
+            if change_summary is not None:
+                if change_type == ChangeType.CREATE.value:
+                    change_summary.create_count += 1
+                elif change_type == ChangeType.MODIFY.value:
+                    change_summary.modify_count += 1
+                elif change_type == ChangeType.DELETE.value:
+                    change_summary.delete_count += 1
+                elif change_type == ChangeType.NO_CHANGE.value:
+                    change_summary.no_change_count += 1
+
+            if change_type not in (
                 ChangeType.NO_CHANGE.value,
                 ChangeType.IGNORE.value,
             ):
-                significant.append(change)
-        return significant
+                preliminary.append(change)
+
+        # Second pass: apply ignore rules for property-level filtering
+        filtered, ignored_count = self._ignore_rules.filter_whatif_changes(preliminary)
+
+        # Update ignored count in provenance summary
+        if change_summary is not None:
+            change_summary.ignored_count = ignored_count
+
+        if ignored_count > 0:
+            logger.info(
+                "Ignore rules filtered changes",
+                extra={
+                    "domain": self._config.domain,
+                    "original_count": len(preliminary),
+                    "filtered_count": len(filtered),
+                    "ignored_properties": ignored_count,
+                },
+            )
+
+        return filtered
 
     def _log_result(self, result: ReconcileResult) -> None:
         """Log reconciliation result with structured data."""
         extra = {
             "domain": result.domain,
+            "mode": result.mode.value,
             "duration_seconds": result.duration_seconds,
             "drift_found": result.drift_found,
             "changes_applied": result.changes_applied,
+            "changes_blocked": result.changes_blocked,
         }
 
         if result.error is not None:
             extra["error"] = str(result.error)
             logger.error("Reconciliation failed", extra=extra)
+        elif result.changes_blocked > 0:
+            logger.warning("Reconciliation: drift blocked (PROTECT mode)", extra=extra)
         else:
             logger.info("Reconciliation result", extra=extra)
 

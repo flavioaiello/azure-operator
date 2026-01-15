@@ -13,7 +13,7 @@ import pytest
 import yaml
 from azure_mock import MockAzureContext
 
-from controller.config import Config, DeploymentScope
+from controller.config import Config, DeploymentScope, ReconciliationMode
 from controller.reconciler import Reconciler
 
 
@@ -92,6 +92,7 @@ class TestReconcilerIntegration:
             templates_dir=temp_templates,
             specs_dir=temp_specs,
             scope=DeploymentScope.SUBSCRIPTION,
+            mode=ReconciliationMode.ENFORCE,  # ENFORCE mode for tests that expect changes
             dry_run=False,
             reconcile_interval_seconds=60,
         )
@@ -515,6 +516,7 @@ class TestALZManagementGroupScope:
             specs_dir=mg_specs,
             scope=DeploymentScope.MANAGEMENT_GROUP,
             management_group_id="contoso",
+            mode=ReconciliationMode.ENFORCE,  # ENFORCE mode for tests that expect changes
             dry_run=False,
             reconcile_interval_seconds=60,
         )

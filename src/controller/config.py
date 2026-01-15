@@ -20,6 +20,27 @@ class DeploymentScope(str, Enum):
     RESOURCE_GROUP = "resourceGroup"
 
 
+class ReconciliationMode(str, Enum):
+    """Reconciliation modes for drift handling.
+
+    OBSERVE: Report drift only, never apply changes.
+             Logs drift detection results but takes no remediation action.
+             Use for: Initial deployment validation, auditing, shadow mode.
+
+    ENFORCE: Automatically remediate drift (apply changes).
+             This is the default Kubernetes-style reconciliation behavior.
+             Use for: Production landing zones with tested configurations.
+
+    PROTECT: Block external changes that violate desired state.
+             Reports drift and blocks apply, requiring manual intervention.
+             Use for: Critical resources (RBAC, firewalls) where auto-fix is risky.
+    """
+
+    OBSERVE = "observe"
+    ENFORCE = "enforce"
+    PROTECT = "protect"
+
+
 class ConfigurationError(Exception):
     """Raised when configuration validation fails."""
 
@@ -106,12 +127,18 @@ class Config:
     management_group_id: str | None = None
     resource_group_name: str | None = None
 
+    # Reconciliation mode
+    # OBSERVE: Report drift only, never apply
+    # ENFORCE: Automatically fix drift (default)
+    # PROTECT: Block changes, require manual intervention
+    mode: ReconciliationMode = ReconciliationMode.OBSERVE  # Safe default
+
     # Timing
     reconcile_interval_seconds: int = DEFAULT_RECONCILE_INTERVAL_SECONDS
     whatif_timeout_seconds: int = DEFAULT_WHATIF_TIMEOUT_SECONDS
     deployment_timeout_seconds: int = DEFAULT_DEPLOYMENT_TIMEOUT_SECONDS
 
-    # Behavior
+    # Behavior - deprecated, use mode=OBSERVE instead
     dry_run: bool = False
 
     # Resource Graph fast-path check
@@ -206,7 +233,11 @@ class Config:
             RECONCILE_INTERVAL: Seconds between reconciliation loops (default: 300)
             WHATIF_TIMEOUT: Timeout for WhatIf operations in seconds (default: 300)
             DEPLOYMENT_TIMEOUT: Timeout for deployments in seconds (default: 1800)
-            DRY_RUN: If "true", only detect drift without applying (default: false)
+            RECONCILIATION_MODE: One of observe, enforce, protect (default: observe)
+                - observe: Report drift only, never apply (safe default)
+                - enforce: Automatically remediate drift
+                - protect: Block changes, require manual intervention
+            DRY_RUN: DEPRECATED - use RECONCILIATION_MODE=observe instead
             ENABLE_GRAPH_CHECK: If "true", use Resource Graph for fast-path drift
                 detection before WhatIf (default: true). This reduces WhatIf calls
                 by ~90% when no external changes occurred.
@@ -246,6 +277,27 @@ class Config:
                 valid = [s.value for s in DeploymentScope]
                 raise ConfigurationError(f"DEPLOYMENT_SCOPE must be one of {valid}: {value}") from e
 
+        def get_mode(value: str | None) -> ReconciliationMode:
+            if not value:
+                return ReconciliationMode.OBSERVE  # Safe default
+            try:
+                return ReconciliationMode(value.lower())
+            except ValueError as e:
+                valid = [m.value for m in ReconciliationMode]
+                raise ConfigurationError(
+                    f"RECONCILIATION_MODE must be one of {valid}: {value}"
+                ) from e
+
+        # Handle DRY_RUN -> OBSERVE mode migration
+        dry_run = get_bool("DRY_RUN", False)
+        mode_env = os.environ.get("RECONCILIATION_MODE")
+        # Legacy: DRY_RUN=true without explicit mode maps to OBSERVE
+        mode = (
+            ReconciliationMode.OBSERVE
+            if dry_run and not mode_env
+            else get_mode(mode_env)
+        )
+
         return cls(
             domain=os.environ.get("DOMAIN", ""),
             subscription_id=os.environ.get("AZURE_SUBSCRIPTION_ID", ""),
@@ -255,6 +307,7 @@ class Config:
             scope=get_scope(os.environ.get("DEPLOYMENT_SCOPE")),
             management_group_id=os.environ.get("MANAGEMENT_GROUP_ID"),
             resource_group_name=os.environ.get("RESOURCE_GROUP_NAME"),
+            mode=mode,
             reconcile_interval_seconds=get_int(
                 "RECONCILE_INTERVAL", DEFAULT_RECONCILE_INTERVAL_SECONDS
             ),
@@ -262,7 +315,7 @@ class Config:
             deployment_timeout_seconds=get_int(
                 "DEPLOYMENT_TIMEOUT", DEFAULT_DEPLOYMENT_TIMEOUT_SECONDS
             ),
-            dry_run=get_bool("DRY_RUN", False),
+            dry_run=dry_run,
             enable_graph_check=get_bool("ENABLE_GRAPH_CHECK", DEFAULT_GRAPH_CHECK_ENABLED),
             # Security config - secretless is enforced at runtime in security.py
             security=SecurityConfig(

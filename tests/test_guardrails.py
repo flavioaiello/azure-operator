@@ -19,6 +19,7 @@ from controller.guardrails import (
     DEFAULT_DENIED_MANAGEMENT_GROUPS,
     TENANT_ROOT_MG_NAMES,
     ChangeCategory,
+    ConcurrencyViolation,
     GuardrailEnforcer,
     GuardrailsConfig,
     GuardrailViolation,
@@ -554,3 +555,104 @@ class TestExceptionHierarchy:
         """Test that KillSwitchActive inherits from GuardrailViolation."""
         exc = KillSwitchActive("test")
         assert isinstance(exc, GuardrailViolation)
+
+    def test_concurrency_violation_is_guardrail_violation(self) -> None:
+        """Test that ConcurrencyViolation inherits from GuardrailViolation."""
+        exc = ConcurrencyViolation("test")
+        assert isinstance(exc, GuardrailViolation)
+
+
+class TestConcurrencyControl:
+    """Tests for scope locking and concurrency control."""
+
+    @pytest.fixture
+    def config(self) -> GuardrailsConfig:
+        """Create a test configuration with concurrency settings."""
+        return GuardrailsConfig(
+            max_concurrent_deployments_per_scope=1,
+            scope_lock_timeout_seconds=5,
+            check_active_deployments=True,
+        )
+
+    @pytest.fixture
+    def enforcer(self, config: GuardrailsConfig) -> GuardrailEnforcer:
+        """Create a guardrail enforcer."""
+        return GuardrailEnforcer(config)
+
+    @pytest.mark.asyncio
+    async def test_acquire_scope_lock_success(
+        self, enforcer: GuardrailEnforcer
+    ) -> None:
+        """Test successful scope lock acquisition."""
+        result = await enforcer.acquire_scope_lock("subscription", "sub-123")
+        assert result is True
+        assert enforcer._scope_active_deployments.get("subscription:sub-123") == 1
+
+    @pytest.mark.asyncio
+    async def test_release_scope_lock(
+        self, enforcer: GuardrailEnforcer
+    ) -> None:
+        """Test scope lock release."""
+        await enforcer.acquire_scope_lock("subscription", "sub-123")
+        assert enforcer._scope_active_deployments.get("subscription:sub-123") == 1
+
+        enforcer.release_scope_lock("subscription", "sub-123")
+        assert enforcer._scope_active_deployments.get("subscription:sub-123") == 0
+
+    @pytest.mark.asyncio
+    async def test_max_concurrent_deployments_exceeded(
+        self, enforcer: GuardrailEnforcer
+    ) -> None:
+        """Test that exceeding max concurrent deployments raises."""
+        # Acquire first lock
+        await enforcer.acquire_scope_lock("subscription", "sub-123")
+
+        # Second acquire should fail
+        with pytest.raises(ConcurrencyViolation) as exc_info:
+            await enforcer.acquire_scope_lock("subscription", "sub-123")
+
+        assert "Max concurrent deployments" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_scope_locks_are_independent(
+        self, enforcer: GuardrailEnforcer
+    ) -> None:
+        """Test that different scopes have independent locks."""
+        await enforcer.acquire_scope_lock("subscription", "sub-123")
+        # Different subscription should succeed
+        result = await enforcer.acquire_scope_lock("subscription", "sub-456")
+        assert result is True
+
+        # Different scope type should succeed
+        result = await enforcer.acquire_scope_lock("management_group", "mg-001")
+        assert result is True
+
+    def test_get_scope_key(self, enforcer: GuardrailEnforcer) -> None:
+        """Test scope key generation."""
+        key = enforcer._get_scope_key("subscription", "sub-123")
+        assert key == "subscription:sub-123"
+
+        key = enforcer._get_scope_key("management_group", "contoso")
+        assert key == "management_group:contoso"
+
+    def test_concurrency_config_defaults(self) -> None:
+        """Test default concurrency configuration."""
+        config = GuardrailsConfig()
+        assert config.max_concurrent_deployments_per_scope == 1
+        assert config.scope_lock_timeout_seconds == 30
+        assert config.check_active_deployments is True
+
+    @patch.dict(
+        os.environ,
+        {
+            "MAX_CONCURRENT_DEPLOYMENTS_PER_SCOPE": "3",
+            "SCOPE_LOCK_TIMEOUT": "60",
+            "CHECK_ACTIVE_DEPLOYMENTS": "false",
+        },
+    )
+    def test_concurrency_config_from_env(self) -> None:
+        """Test concurrency configuration from environment."""
+        config = GuardrailsConfig.from_env()
+        assert config.max_concurrent_deployments_per_scope == 3
+        assert config.scope_lock_timeout_seconds == 60
+        assert config.check_active_deployments is False
