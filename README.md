@@ -150,7 +150,7 @@ Each operator manages a **single concern** with its own:
 - **Spec file** — Concern-specific YAML configuration
 - **Bicep template** — Concern-specific resource definitions
 
-### Granular Operators (19 total + 10 secondary region aliases)
+### Granular Operators (21 types, 10 with secondary region variants)
 
 | Category | Operator | Scope | Resources | RBAC |
 |----------|----------|-------|-----------|------|
