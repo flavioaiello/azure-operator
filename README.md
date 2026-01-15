@@ -13,6 +13,7 @@ A **Python-based, stateless operator framework** for continuously reconciling Az
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Pydantic v2](https://img.shields.io/badge/pydantic-v2-E92063.svg)](https://docs.pydantic.dev/)
 [![Azure SDK](https://img.shields.io/badge/Azure%20SDK-Latest-0078D4.svg)](https://github.com/Azure/azure-sdk-for-python)
+[![AVM Modules](https://img.shields.io/badge/Bicep-AVM%20Modules-0078D4.svg)](https://aka.ms/avm)
 [![Security: Secretless](https://img.shields.io/badge/security-secretless-brightgreen.svg)](#secretless-architecture-mandatory)
 [![Tests: 453 passing](https://img.shields.io/badge/tests-453%20passing-brightgreen.svg)](tests/)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-flavioaiello%2Fazure--operator-blue.svg?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNNCAxOWg0djJINHoiLz48cGF0aCBkPSJNMTAgMTloNHYyaC00eiIvPjxwYXRoIGQ9Ik0xNiAxOWg0djJoLTR6Ii8+PHBhdGggZD0iTTQgMTFoMTZ2Mkg0eiIvPjxwYXRoIGQ9Ik00IDNoMTZ2Mkg0eiIvPjxwYXRoIGQ9Ik04IDN2MTYiLz48cGF0aCBkPSJNMTYgM3YxNiIvPjwvc3ZnPg==)](https://deepwiki.com/flavioaiello/azure-operator)
@@ -47,6 +48,26 @@ A **Python-based, stateless operator framework** for continuously reconciling Az
    - Each operator is a separate container instance
    - No shared runtime, no shared secrets, no shared failure modes
    - Private VNet deployment — no public IP addresses
+
+### Built on Azure Verified Modules (AVM)
+
+All Bicep templates in this project are built on [**Azure Verified Modules (AVM)**](https://aka.ms/avm) — Microsoft's official, production-grade module library.
+
+| Benefit | Description |
+|---------|-------------|
+| **Microsoft-Maintained** | Owned and supported by Microsoft product teams |
+| **Security-Reviewed** | Modules pass Microsoft's security and compliance reviews |
+| **Well-Architected** | Follow Azure Well-Architected Framework best practices |
+| **Versioned & Stable** | Semantic versioning with breaking change policies |
+| **Telemetry & Support** | Built-in telemetry for supportability |
+
+The operators use AVM modules from the [Bicep Public Registry](https://github.com/Azure/bicep-registry-modules), including:
+- `avm/ptn/network/hub-networking` — Hub networking pattern
+- `avm/res/network/azure-firewall` — Azure Firewall
+- `avm/res/network/bastion-host` — Azure Bastion
+- `avm/res/network/virtual-network` — Virtual Networks
+- `avm/res/network/ddos-protection-plan` — DDoS Protection
+- `avm/res/operational-insights/workspace` — Log Analytics
 
 ---
 
