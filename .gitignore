@@ -41,6 +41,7 @@ bicepconfig.json
 *.swo
 *~
 AGENTS.md
+ROADMAP.md
 
 # OS
 .DS_Store
