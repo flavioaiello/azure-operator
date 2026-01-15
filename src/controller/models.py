@@ -1377,7 +1377,7 @@ SPEC_REGISTRY: dict[str, type[BaseSpec]] = {
     "policy": PolicySpec,
     "role": RoleSpec,
     # Secondary region specs (reuse primary spec classes)
-    # Multi-region scenarios use -secondary suffix for second region
+    # Multi-region archetypes use -secondary suffix for second region
     "bastion-secondary": BastionSpec,
     "firewall-secondary": FirewallSpec,
     "hub-network-secondary": HubNetworkSpec,

@@ -642,15 +642,15 @@ The operator will:
 
 ---
 
-## Scenarios
+## Archetypes
 
-Pre-configured deployment patterns matching [ALZ Accelerator scenarios](https://azure.github.io/Azure-Landing-Zones/accelerator/startermodules/terraform-platform-landing-zone/scenarios/).
+Pre-configured deployment patterns matching [ALZ Accelerator archetypes](https://azure.github.io/Azure-Landing-Zones/accelerator/startermodules/terraform-platform-landing-zone/archetypes/).
 
-Each scenario directory contains **ready-to-use operator specs** — no generation step required.
+Each archetype directory contains **ready-to-use operator specs** — no generation step required.
 
-### Available Scenarios
+### Available Archetypes
 
-| # | Scenario | Topology | Firewall | Regions |
+| # | Archetype | Topology | Firewall | Regions |
 |---|----------|----------|----------|---------|
 | 1 | Multi-Region Hub-Spoke + Azure Firewall | Hub-Spoke | Azure | 2 |
 | 2 | Multi-Region Virtual WAN + Azure Firewall | vWAN | Azure | 2 |
@@ -664,24 +664,24 @@ Each scenario directory contains **ready-to-use operator specs** — no generati
 
 ⭐ **Recommended starting point** for most organizations
 
-### Using a Scenario
+### Using a Archetype
 
 ```bash
-# 1. Copy a scenario as your starting point
-cp -r scenarios/6-single-region-hub-spoke-azfw scenarios/my-landing-zone
+# 1. Copy a archetype as your starting point
+cp -r archetypes/6-single-region-hub-spoke-azfw archetypes/my-landing-zone
 
 # 2. Edit specs to match your environment (look for "# CHANGE:" comments)
-vim scenarios/my-landing-zone/specs/hub-network.yaml
-vim scenarios/my-landing-zone/specs/firewall.yaml
+vim archetypes/my-landing-zone/specs/hub-network.yaml
+vim archetypes/my-landing-zone/specs/firewall.yaml
 
-# 3. Deploy operators pointing to your scenario
+# 3. Deploy operators pointing to your archetype
 az deployment sub create \
   --location westeurope \
   --template-file infrastructure/main.bicep \
-  --parameters scenarioPath="scenarios/my-landing-zone/specs"
+  --parameters archetypePath="archetypes/my-landing-zone/specs"
 ```
 
-### Scenario Selection Matrix
+### Archetype Selection Matrix
 
 ```
                       ┌─────────────────────────────────────────────┐
@@ -690,18 +690,18 @@ az deployment sub create \
                       │     Hub-Spoke       │     Virtual WAN        │
 ┌─────────────────────┼─────────────────────┼───────────────────────┤
 │ Multi-Region        │                     │                       │
-│   + Azure Firewall  │    Scenario 1       │    Scenario 2         │
-│   + NVA             │    Scenario 3       │    Scenario 4         │
+│   + Azure Firewall  │    Archetype 1       │    Archetype 2         │
+│   + NVA             │    Archetype 3       │    Archetype 4         │
 ├─────────────────────┼─────────────────────┼───────────────────────┤
 │ Single-Region       │                     │                       │
-│   + Azure Firewall  │    Scenario 6 ⭐    │    Scenario 7         │
-│   + NVA             │    Scenario 8       │    Scenario 9         │
+│   + Azure Firewall  │    Archetype 6 ⭐    │    Archetype 7         │
+│   + NVA             │    Archetype 8       │    Archetype 9         │
 ├─────────────────────┼─────────────────────┴───────────────────────┤
-│ Management Only     │              Scenario 5                     │
+│ Management Only     │              Archetype 5                     │
 └─────────────────────┴─────────────────────────────────────────────┘
 ```
 
-See [scenarios/README.md](scenarios/README.md) for detailed documentation.
+See [archetypes/README.md](archetypes/README.md) for detailed documentation.
 
 ---
 
@@ -749,10 +749,10 @@ az deployment mg create \
 
 ### 4. Configure Specs
 
-Choose a scenario from `scenarios/` and edit YAML files:
+Choose a archetype from `archetypes/` and edit YAML files:
 
 ```yaml
-# scenarios/6-single-region-hub-spoke-azfw/specs/hub-network.yaml
+# archetypes/6-single-region-hub-spoke-azfw/specs/hub-network.yaml
 apiVersion: azure-operator/v1
 kind: HubNetworkOperator
 metadata:
@@ -835,7 +835,7 @@ spec:
     managedBy: azure-operator
 ```
 
-See individual spec files in `scenarios/*/specs/` directory for domain-specific configuration options.
+See individual spec files in `archetypes/*/specs/` directory for domain-specific configuration options.
 
 ---
 

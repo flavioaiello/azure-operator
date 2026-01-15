@@ -1,26 +1,26 @@
-# Azure Landing Zone Scenarios
+# Azure Landing Zone Archetypes
 
-Each scenario directory contains **ready-to-use operator specs** — no generation step required.
+Each archetype directory contains **ready-to-use operator specs** — no generation step required.
 
 ## Quick Start
 
 ```bash
-# Copy a scenario as your starting point
-cp -r scenarios/6-single-region-hub-spoke-azfw scenarios/my-landing-zone
+# Copy a archetype as your starting point
+cp -r archetypes/6-single-region-hub-spoke-azfw archetypes/my-landing-zone
 
 # Edit specs to match your environment
-vim scenarios/my-landing-zone/specs/hub-network.yaml
+vim archetypes/my-landing-zone/specs/hub-network.yaml
 
 # Deploy
 az deployment sub create \
   --location westeurope \
   --template-file infrastructure/main.bicep \
-  --parameters scenarioPath="scenarios/my-landing-zone/specs"
+  --parameters archetypePath="archetypes/my-landing-zone/specs"
 ```
 
-## Available Scenarios
+## Available Archetypes
 
-| # | Scenario | Topology | Firewall | Regions | Directory |
+| # | Archetype | Topology | Firewall | Regions | Directory |
 |---|----------|----------|----------|---------|-----------|
 | 1 | Multi-Region Hub-Spoke + Azure Firewall | Hub-Spoke | Azure | 2 | `1-multi-region-hub-spoke-azfw/` |
 | 2 | Multi-Region Virtual WAN + Azure Firewall | vWAN | Azure | 2 | `2-multi-region-vwan-azfw/` |
@@ -34,7 +34,7 @@ az deployment sub create \
 
 ⭐ **Recommended starting point** for most organizations
 
-## Scenario Selection Matrix
+## Archetype Selection Matrix
 
 ```
                       ┌─────────────────────────────────────────────┐
@@ -43,20 +43,20 @@ az deployment sub create \
                       │     Hub-Spoke       │     Virtual WAN        │
 ┌─────────────────────┼─────────────────────┼───────────────────────┤
 │ Multi-Region        │                     │                       │
-│   + Azure Firewall  │    Scenario 1       │    Scenario 2         │
-│   + NVA             │    Scenario 3       │    Scenario 4         │
+│   + Azure Firewall  │    Archetype 1       │    Archetype 2         │
+│   + NVA             │    Archetype 3       │    Archetype 4         │
 ├─────────────────────┼─────────────────────┼───────────────────────┤
 │ Single-Region       │                     │                       │
-│   + Azure Firewall  │    Scenario 6 ⭐    │    Scenario 7         │
-│   + NVA             │    Scenario 8       │    Scenario 9         │
+│   + Azure Firewall  │    Archetype 6 ⭐    │    Archetype 7         │
+│   + NVA             │    Archetype 8       │    Archetype 9         │
 ├─────────────────────┼─────────────────────┴───────────────────────┤
-│ Management Only     │              Scenario 5                     │
+│ Management Only     │              Archetype 5                     │
 └─────────────────────┴─────────────────────────────────────────────┘
 ```
 
 ## What Gets Deployed
 
-### All Scenarios Include
+### All Archetypes Include
 
 | Operator | Purpose |
 |----------|---------|
@@ -69,7 +69,7 @@ az deployment sub create \
 
 > **Policy Management:** Use [Enterprise Policy as Code (EPAC)](https://aka.ms/epac) for Azure Policy.
 
-### Connectivity Operators (varies by scenario)
+### Connectivity Operators (varies by archetype)
 
 | Operator | Hub-Spoke | vWAN | NVA |
 |----------|-----------|------|-----|
@@ -102,7 +102,7 @@ Every spec file has `# CHANGE:` comments marking values you must update:
 ## Directory Structure
 
 ```
-scenarios/
+archetypes/
 ├── 1-multi-region-hub-spoke-azfw/
 │   ├── README.md
 │   └── specs/
