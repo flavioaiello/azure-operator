@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -26,7 +27,12 @@ const (
 	DefaultDeploymentTimeout  = 30 * time.Minute
 	DeploymentNameRandomBytes = 4
 	MaxDeploymentNameLength   = 64
-	PollingInterval           = 5 * time.Second
+	// PollingInterval is the base polling interval for deployment status checks.
+	PollingInterval = 5 * time.Second
+	// MaxPollingInterval is the maximum polling interval with exponential backoff.
+	MaxPollingInterval = 60 * time.Second
+	// PollingBackoffFactor is the multiplier for exponential backoff.
+	PollingBackoffFactor = 1.5
 )
 
 // DeploymentMode determines deployment behavior.
@@ -386,11 +392,16 @@ func (e *Executor) pollResourceGroupDeployment(
 	resourceGroup string,
 	deploymentName string,
 ) (*armDeploymentResult, error) {
+	pollCount := 0
 	for {
+		// Calculate backoff interval: base * factor^pollCount, capped at max.
+		backoffMs := float64(PollingInterval.Milliseconds()) * math.Pow(PollingBackoffFactor, float64(pollCount))
+		interval := time.Duration(math.Min(backoffMs, float64(MaxPollingInterval.Milliseconds()))) * time.Millisecond
+
 		select {
 		case <-ctx.Done():
 			return nil, ErrDeploymentTimeout
-		case <-time.After(PollingInterval):
+		case <-time.After(interval):
 			resp, err := e.deploymentsClient.Get(ctx, resourceGroup, deploymentName, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get deployment status: %w", err)
@@ -405,6 +416,7 @@ func (e *Executor) pollResourceGroupDeployment(
 			case armresources.ProvisioningStateFailed, armresources.ProvisioningStateCanceled:
 				return nil, fmt.Errorf("%w: %s", ErrDeploymentFailed, state)
 			}
+			pollCount++
 		}
 	}
 }
@@ -413,11 +425,16 @@ func (e *Executor) pollSubscriptionDeployment(
 	ctx context.Context,
 	deploymentName string,
 ) (*armDeploymentResult, error) {
+	pollCount := 0
 	for {
+		// Calculate backoff interval: base * factor^pollCount, capped at max.
+		backoffMs := float64(PollingInterval.Milliseconds()) * math.Pow(PollingBackoffFactor, float64(pollCount))
+		interval := time.Duration(math.Min(backoffMs, float64(MaxPollingInterval.Milliseconds()))) * time.Millisecond
+
 		select {
 		case <-ctx.Done():
 			return nil, ErrDeploymentTimeout
-		case <-time.After(PollingInterval):
+		case <-time.After(interval):
 			resp, err := e.deploymentsClient.GetAtSubscriptionScope(ctx, deploymentName, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get deployment status: %w", err)
@@ -432,6 +449,7 @@ func (e *Executor) pollSubscriptionDeployment(
 			case armresources.ProvisioningStateFailed, armresources.ProvisioningStateCanceled:
 				return nil, fmt.Errorf("%w: %s", ErrDeploymentFailed, state)
 			}
+			pollCount++
 		}
 	}
 }
