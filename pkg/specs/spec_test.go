@@ -4,6 +4,11 @@ import (
 	"testing"
 )
 
+// Test constants.
+const (
+	testResourceGroup = "rg-test"
+)
+
 func TestGenericSpec_Validate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -20,7 +25,7 @@ func TestGenericSpec_Validate(t *testing.T) {
 			spec: &GenericSpec{
 				Operator:          "connectivity",
 				Location:          "westeurope",
-				ResourceGroupName: "rg-test",
+				ResourceGroupName: testResourceGroup,
 				Tags: map[string]string{
 					"environment": "test",
 				},
@@ -61,7 +66,7 @@ func TestGenericSpec_ToARMParameters(t *testing.T) {
 		{
 			name: "resourceGroupName is converted to ARM parameter",
 			spec: &GenericSpec{
-				ResourceGroupName: "rg-test",
+				ResourceGroupName: testResourceGroup,
 			},
 			wantKeys: []string{"resourceGroupName"},
 		},
@@ -219,7 +224,7 @@ func TestGenericSpec_GetOperator(t *testing.T) {
 	}
 }
 
-func TestGenericSpec_ImplementsSpec(t *testing.T) {
+func TestGenericSpec_ImplementsSpec(_ *testing.T) {
 	// Compile-time check that GenericSpec implements Spec interface.
 	var _ Spec = (*GenericSpec)(nil)
 }
@@ -271,7 +276,7 @@ func TestArmParam(t *testing.T) {
 func TestGenericSpec_SkipsReservedFields(t *testing.T) {
 	spec := &GenericSpec{
 		Location:          "westeurope",
-		ResourceGroupName: "rg-test",
+		ResourceGroupName: testResourceGroup,
 		Tags:              map[string]string{"env": "test"},
 		DependsOn:         []string{"identity"},
 		Parameters: map[string]interface{}{
@@ -295,7 +300,7 @@ func TestGenericSpec_SkipsReservedFields(t *testing.T) {
 	}
 
 	if rg, ok := params["resourceGroupName"].(map[string]interface{}); ok {
-		if rg["value"] != "rg-test" {
+		if rg["value"] != testResourceGroup {
 			t.Errorf("resourceGroupName should be 'rg-test', got %v", rg["value"])
 		}
 	}

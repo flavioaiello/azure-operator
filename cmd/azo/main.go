@@ -35,6 +35,10 @@ const (
 	flagTemplatesDir    = "templates-dir"
 	descSpecsDir        = "Specs directory"
 	descTemplatesDir    = "Templates directory"
+
+	// Warning messages for unimplemented features.
+	warnMigrateNotImpl    = "migrate not yet implemented"
+	warnValidationNotImpl = "validation not yet implemented"
 )
 
 func main() {
@@ -473,7 +477,7 @@ func newMigrateCmd() *cobra.Command {
 			logger.Info("Migration status",
 				zap.String("operator", operator),
 			)
-			logger.Warn("migrate not yet implemented")
+			logger.Warn(warnMigrateNotImpl)
 			return nil
 		},
 	}
@@ -489,7 +493,7 @@ func newMigrateCmd() *cobra.Command {
 			logger.Info("Promoting operator",
 				zap.String("operator", operator),
 			)
-			logger.Warn("migrate not yet implemented")
+			logger.Warn(warnMigrateNotImpl)
 			return nil
 		},
 	}
@@ -506,7 +510,7 @@ func newMigrateCmd() *cobra.Command {
 			logger.Info("Rolling back operator",
 				zap.String("operator", operator),
 			)
-			logger.Warn("migrate not yet implemented")
+			logger.Warn(warnMigrateNotImpl)
 			return nil
 		},
 	}
@@ -521,7 +525,7 @@ func newMigrateCmd() *cobra.Command {
 				zap.String("operator", operator),
 				zap.String("resultsDir", resultsDir),
 			)
-			logger.Warn("migrate not yet implemented")
+			logger.Warn(warnMigrateNotImpl)
 			return nil
 		},
 	}
@@ -549,7 +553,7 @@ func newValidateCmd() *cobra.Command {
 			logger.Info("Validating specs",
 				zap.String("dir", specsDir),
 			)
-			logger.Warn("validation not yet implemented")
+			logger.Warn(warnValidationNotImpl)
 			return nil
 		},
 	}
@@ -562,7 +566,7 @@ func newValidateCmd() *cobra.Command {
 			logger.Info("Validating templates",
 				zap.String("dir", templatesDir),
 			)
-			logger.Warn("validation not yet implemented")
+			logger.Warn(warnValidationNotImpl)
 			return nil
 		},
 	}
@@ -577,7 +581,7 @@ func newValidateCmd() *cobra.Command {
 				zap.String("dir1", args[0]),
 				zap.String("dir2", args[1]),
 			)
-			logger.Warn("validation not yet implemented")
+			logger.Warn(warnValidationNotImpl)
 			return nil
 		},
 	}
