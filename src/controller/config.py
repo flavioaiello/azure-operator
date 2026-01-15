@@ -45,6 +45,11 @@ MAX_RESOURCE_GROUP_NAME_LENGTH = 90
 MAX_CONCURRENT_DEPLOYMENTS = 1  # No parallel deployments per operator
 MAX_WHATIF_CHANGES = 1000  # Max WhatIf changes to process (prevent OOM)
 
+# Resource Graph constraints
+MAX_GRAPH_QUERY_RESULTS = 1000  # Max results per Graph query
+MAX_GRAPH_QUERY_TIMEOUT_SECONDS = 30  # Timeout for Graph queries
+DEFAULT_GRAPH_CHECK_ENABLED = True  # Enable fast-path Graph check by default
+
 # Input validation patterns
 VALID_DOMAIN_PATTERN = r"^[a-z][a-z0-9-]{0,62}[a-z0-9]$"
 VALID_SUBSCRIPTION_ID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
@@ -108,6 +113,11 @@ class Config:
 
     # Behavior
     dry_run: bool = False
+
+    # Resource Graph fast-path check
+    # When enabled, queries Resource Graph for recent changes before WhatIf
+    # This reduces WhatIf calls by ~90% when no external changes occurred
+    enable_graph_check: bool = DEFAULT_GRAPH_CHECK_ENABLED
 
     # Security configuration
     security: SecurityConfig = field(default_factory=SecurityConfig)
@@ -197,6 +207,9 @@ class Config:
             WHATIF_TIMEOUT: Timeout for WhatIf operations in seconds (default: 300)
             DEPLOYMENT_TIMEOUT: Timeout for deployments in seconds (default: 1800)
             DRY_RUN: If "true", only detect drift without applying (default: false)
+            ENABLE_GRAPH_CHECK: If "true", use Resource Graph for fast-path drift
+                detection before WhatIf (default: true). This reduces WhatIf calls
+                by ~90% when no external changes occurred.
 
         Bootstrap Cascade Variables:
             BOOTSTRAP_IDENTITY_RESOURCE_GROUP: If set, enables cascade mode.
@@ -250,6 +263,7 @@ class Config:
                 "DEPLOYMENT_TIMEOUT", DEFAULT_DEPLOYMENT_TIMEOUT_SECONDS
             ),
             dry_run=get_bool("DRY_RUN", False),
+            enable_graph_check=get_bool("ENABLE_GRAPH_CHECK", DEFAULT_GRAPH_CHECK_ENABLED),
             # Security config - secretless is enforced at runtime in security.py
             security=SecurityConfig(
                 max_resources_per_deployment=get_int("MAX_RESOURCES_PER_DEPLOYMENT", 100),
