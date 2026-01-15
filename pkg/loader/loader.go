@@ -115,7 +115,24 @@ func GetTemplateDir(operator string) string {
 func (l *Loader) LoadSpec(domain string) (specs.Spec, error) {
 	specPath := filepath.Join(l.specsDir, domain+".yaml")
 
-	// Check file exists and size.
+	data, err := l.readSpecFile(specPath)
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := parseYAML(specPath, data)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle Kubernetes-style wrapper (apiVersion/kind/metadata/spec).
+	specData := unwrapK8sStyle(raw)
+
+	return buildGenericSpec(domain, specData), nil
+}
+
+// readSpecFile reads and validates spec file size.
+func (l *Loader) readSpecFile(specPath string) ([]byte, error) {
 	info, err := os.Stat(specPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -130,7 +147,6 @@ func (l *Loader) LoadSpec(domain string) (specs.Spec, error) {
 			ErrSpecTooLarge, specPath, info.Size(), MaxSpecFileSizeBytes)
 	}
 
-	// Read file with limit.
 	file, err := os.Open(specPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open spec file: %w", err)
@@ -142,27 +158,35 @@ func (l *Loader) LoadSpec(domain string) (specs.Spec, error) {
 		return nil, fmt.Errorf("failed to read spec file: %w", err)
 	}
 
-	// Parse YAML.
+	return data, nil
+}
+
+// parseYAML parses YAML data into a map.
+func parseYAML(specPath string, data []byte) (map[string]interface{}, error) {
 	var raw map[string]interface{}
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("%w: %s: %v", ErrInvalidYAML, specPath, err)
 	}
+	return raw, nil
+}
 
-	// Handle Kubernetes-style wrapper (apiVersion/kind/metadata/spec).
-	specData := raw
+// unwrapK8sStyle handles Kubernetes-style wrapper (apiVersion/kind/metadata/spec).
+func unwrapK8sStyle(raw map[string]interface{}) map[string]interface{} {
 	if _, hasAPIVersion := raw["apiVersion"]; hasAPIVersion {
 		if specSection, ok := raw["spec"].(map[string]interface{}); ok {
-			specData = specSection
+			return specSection
 		}
 	}
+	return raw
+}
 
-	// Create generic spec - passes through to AVM.
+// buildGenericSpec creates a GenericSpec from parsed data.
+func buildGenericSpec(domain string, specData map[string]interface{}) *specs.GenericSpec {
 	spec := &specs.GenericSpec{
 		Operator:   domain,
 		Parameters: make(map[string]interface{}),
 	}
 
-	// Extract known fields, rest goes to Parameters.
 	for k, v := range specData {
 		switch k {
 		case "location":
@@ -174,29 +198,45 @@ func (l *Loader) LoadSpec(domain string) (specs.Spec, error) {
 				spec.ResourceGroupName = s
 			}
 		case "tags":
-			if m, ok := v.(map[string]interface{}); ok {
-				spec.Tags = make(map[string]string)
-				for tk, tv := range m {
-					if ts, ok := tv.(string); ok {
-						spec.Tags[tk] = ts
-					}
-				}
-			}
+			spec.Tags = extractTags(v)
 		case "dependsOn":
-			if arr, ok := v.([]interface{}); ok {
-				for _, item := range arr {
-					if s, ok := item.(string); ok {
-						spec.DependsOn = append(spec.DependsOn, s)
-					}
-				}
-			}
+			spec.DependsOn = extractDependsOn(v)
 		default:
-			// Pass through to AVM.
 			spec.Parameters[k] = v
 		}
 	}
 
-	return spec, nil
+	return spec
+}
+
+// extractTags extracts tags from interface{} to map[string]string.
+func extractTags(v interface{}) map[string]string {
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	tags := make(map[string]string)
+	for tk, tv := range m {
+		if ts, ok := tv.(string); ok {
+			tags[tk] = ts
+		}
+	}
+	return tags
+}
+
+// extractDependsOn extracts dependsOn from interface{} to []string.
+func extractDependsOn(v interface{}) []string {
+	arr, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+	var deps []string
+	for _, item := range arr {
+		if s, ok := item.(string); ok {
+			deps = append(deps, s)
+		}
+	}
+	return deps
 }
 
 // LoadTemplate loads an ARM template from JSON.

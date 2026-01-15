@@ -9,6 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test constants.
+const (
+	testOperatorLogAnalytics = "log-analytics"
+)
+
 func TestGetTemplateDir(t *testing.T) {
 	tests := []struct {
 		operator string
@@ -17,7 +22,7 @@ func TestGetTemplateDir(t *testing.T) {
 		{"firewall", "connectivity"},
 		{"bastion", "connectivity"},
 		{"hub-network", "connectivity"},
-		{"log-analytics", "management"},
+		{testOperatorLogAnalytics, "management"},
 		{"automation", "management"},
 		{"defender", "security"},
 		{"keyvault", "security"},
@@ -156,7 +161,7 @@ dependsOn:
 
 	deps := spec.GetDependsOn()
 	assert.Contains(t, deps, "hub-network")
-	assert.Contains(t, deps, "log-analytics")
+	assert.Contains(t, deps, testOperatorLogAnalytics)
 }
 
 func TestLoader_LoadTemplate_NotFound(t *testing.T) {
@@ -195,7 +200,7 @@ func TestOperatorToTemplate_Complete(t *testing.T) {
 	expectedMappings := map[string]string{
 		"bootstrap":     "identity",
 		"firewall":      "connectivity",
-		"log-analytics": "management",
+		testOperatorLogAnalytics: "management",
 		"defender":      "security",
 		"policy":        "identity",
 	}

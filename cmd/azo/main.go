@@ -26,6 +26,17 @@ var (
 	logger *zap.Logger
 )
 
+// CLI constants for flag defaults.
+const (
+	defaultOperatorPath = "./cmd/operator"
+	defaultSpecsDir     = "./archetypes/1-multi-region-hub-spoke-azfw/specs"
+	defaultTemplatesDir = "./templates"
+	flagSpecsDir        = "specs-dir"
+	flagTemplatesDir    = "templates-dir"
+	descSpecsDir        = "Specs directory"
+	descTemplatesDir    = "Templates directory"
+)
+
 func main() {
 	// Initialize logger.
 	logger, _ = zap.NewDevelopment()
@@ -33,9 +44,7 @@ func main() {
 		_ = logger.Sync()
 	}()
 
-	rootCmd := newRootCmd()
-
-	if err := rootCmd.Execute(); err != nil {
+	if err := newRootCmd().Execute(); err != nil {
 		os.Exit(1)
 	}
 }
@@ -139,7 +148,7 @@ func newBuildCmd() *cobra.Command {
 			return runCommand("go", "build",
 				"-ldflags", "-s -w",
 				"-o", "bin/operator",
-				"./cmd/operator",
+				defaultOperatorPath,
 			)
 		},
 	}
@@ -173,12 +182,12 @@ func newRunCmd() *cobra.Command {
 			os.Setenv("TEMPLATES_DIR", templatesDir)
 			os.Setenv("RECONCILIATION_MODE", mode)
 
-			return runCommand("go", "run", "./cmd/operator")
+			return runCommand("go", "run", defaultOperatorPath)
 		},
 	}
 
-	cmd.Flags().StringVar(&specsDir, "specs-dir", "./archetypes/1-multi-region-hub-spoke-azfw/specs", "Specs directory")
-	cmd.Flags().StringVar(&templatesDir, "templates-dir", "./templates", "Templates directory")
+	cmd.Flags().StringVar(&specsDir, flagSpecsDir, defaultSpecsDir, descSpecsDir)
+	cmd.Flags().StringVar(&templatesDir, flagTemplatesDir, defaultTemplatesDir, descTemplatesDir)
 	cmd.Flags().StringVar(&mode, "mode", "observe", "Reconciliation mode (observe|enforce|protect)")
 
 	return cmd
@@ -252,13 +261,12 @@ func newDriftCmd() *cobra.Command {
 			os.Setenv("TEMPLATES_DIR", templatesDir)
 			os.Setenv("RECONCILIATION_MODE", "observe")
 
-			// In future: call drift detection directly
-			return runCommand("go", "run", "./cmd/operator", "--once")
+			return runCommand("go", "run", defaultOperatorPath, "--once")
 		},
 	}
 	showCmd.Flags().StringVar(&domain, "domain", "", "Domain to check")
-	showCmd.Flags().StringVar(&specsDir, "specs-dir", "./archetypes/1-multi-region-hub-spoke-azfw/specs", "Specs directory")
-	showCmd.Flags().StringVar(&templatesDir, "templates-dir", "./templates", "Templates directory")
+	showCmd.Flags().StringVar(&specsDir, flagSpecsDir, defaultSpecsDir, descSpecsDir)
+	showCmd.Flags().StringVar(&templatesDir, flagTemplatesDir, defaultTemplatesDir, descTemplatesDir)
 	showCmd.Flags().StringVar(&output, "output", "table", "Output format (table|json|yaml)")
 	_ = showCmd.MarkFlagRequired("domain")
 
@@ -275,12 +283,12 @@ func newDriftCmd() *cobra.Command {
 			os.Setenv("TEMPLATES_DIR", templatesDir)
 			os.Setenv("RECONCILIATION_MODE", "enforce")
 
-			return runCommand("go", "run", "./cmd/operator", "--once")
+			return runCommand("go", "run", defaultOperatorPath, "--once")
 		},
 	}
 	applyCmd.Flags().StringVar(&domain, "domain", "", "Domain to apply")
-	applyCmd.Flags().StringVar(&specsDir, "specs-dir", "./archetypes/1-multi-region-hub-spoke-azfw/specs", "Specs directory")
-	applyCmd.Flags().StringVar(&templatesDir, "templates-dir", "./templates", "Templates directory")
+	applyCmd.Flags().StringVar(&specsDir, flagSpecsDir, defaultSpecsDir, descSpecsDir)
+	applyCmd.Flags().StringVar(&templatesDir, flagTemplatesDir, defaultTemplatesDir, descTemplatesDir)
 	_ = applyCmd.MarkFlagRequired("domain")
 
 	cmd.AddCommand(showCmd, applyCmd)
@@ -299,7 +307,7 @@ func newApprovalCmd() *cobra.Command {
 		Short: "List pending approvals",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger.Info("Listing pending approvals")
-			// TODO: Implement approval listing
+			logger.Warn("approval listing not yet implemented")
 			return nil
 		},
 	}
@@ -313,7 +321,7 @@ func newApprovalCmd() *cobra.Command {
 			logger.Info("Approving deployment",
 				zap.String("id", approvalID),
 			)
-			// TODO: Implement approval
+			logger.Warn("approval not yet implemented")
 			return nil
 		},
 	}
@@ -327,7 +335,7 @@ func newApprovalCmd() *cobra.Command {
 			logger.Info("Rejecting deployment",
 				zap.String("id", approvalID),
 			)
-			// TODO: Implement rejection
+			logger.Warn("rejection not yet implemented")
 			return nil
 		},
 	}
@@ -362,7 +370,7 @@ func newPauseCmd() *cobra.Command {
 				zap.String("operator", operatorName),
 				zap.String("reason", reason),
 			)
-			// TODO: Implement pause with pause.Manager
+			logger.Warn("pause not yet implemented")
 			return nil
 		},
 	}
@@ -378,7 +386,7 @@ func newPauseCmd() *cobra.Command {
 			logger.Info("Resuming operator",
 				zap.String("operator", operatorName),
 			)
-			// TODO: Implement resume with pause.Manager
+			logger.Warn("resume not yet implemented")
 			return nil
 		},
 	}
@@ -390,7 +398,7 @@ func newPauseCmd() *cobra.Command {
 		Short: "Show pause status for operators",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger.Info("Checking pause status")
-			// TODO: Implement status check with pause.Manager
+			logger.Warn("status check not yet implemented")
 			return nil
 		},
 	}
@@ -414,7 +422,7 @@ func newBootstrapCmd() *cobra.Command {
 		Short: "Initialize bootstrap configuration",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger.Info("Initializing bootstrap configuration")
-			// TODO: Generate bootstrap spec template
+			logger.Warn("bootstrap init not yet implemented")
 			return nil
 		},
 	}
@@ -427,7 +435,7 @@ func newBootstrapCmd() *cobra.Command {
 				zap.Bool("dryRun", dryRun),
 				zap.String("config", configFile),
 			)
-			// TODO: Implement with bootstrap.Reconciler
+			logger.Warn("bootstrap not yet implemented")
 			return nil
 		},
 	}
@@ -439,7 +447,7 @@ func newBootstrapCmd() *cobra.Command {
 		Short: "Verify operator identities and RBAC",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logger.Info("Verifying operator infrastructure")
-			// TODO: Implement verification with bootstrap.Reconciler
+			logger.Warn("bootstrap verify not yet implemented")
 			return nil
 		},
 	}
@@ -465,7 +473,7 @@ func newMigrateCmd() *cobra.Command {
 			logger.Info("Migration status",
 				zap.String("operator", operator),
 			)
-			// TODO: Implement with migrate.Controller
+			logger.Warn("migrate not yet implemented")
 			return nil
 		},
 	}
@@ -481,7 +489,7 @@ func newMigrateCmd() *cobra.Command {
 			logger.Info("Promoting operator",
 				zap.String("operator", operator),
 			)
-			// TODO: Implement with migrate.Controller
+			logger.Warn("migrate not yet implemented")
 			return nil
 		},
 	}
@@ -498,7 +506,7 @@ func newMigrateCmd() *cobra.Command {
 			logger.Info("Rolling back operator",
 				zap.String("operator", operator),
 			)
-			// TODO: Implement with migrate.Controller
+			logger.Warn("migrate not yet implemented")
 			return nil
 		},
 	}
@@ -513,7 +521,7 @@ func newMigrateCmd() *cobra.Command {
 				zap.String("operator", operator),
 				zap.String("resultsDir", resultsDir),
 			)
-			// TODO: Implement with migrate.Controller
+			logger.Warn("migrate not yet implemented")
 			return nil
 		},
 	}
@@ -541,7 +549,7 @@ func newValidateCmd() *cobra.Command {
 			logger.Info("Validating specs",
 				zap.String("dir", specsDir),
 			)
-			// TODO: Implement with validate.Validator
+			logger.Warn("validation not yet implemented")
 			return nil
 		},
 	}
@@ -554,7 +562,7 @@ func newValidateCmd() *cobra.Command {
 			logger.Info("Validating templates",
 				zap.String("dir", templatesDir),
 			)
-			// TODO: Implement with validate.Validator
+			logger.Warn("validation not yet implemented")
 			return nil
 		},
 	}
@@ -569,7 +577,7 @@ func newValidateCmd() *cobra.Command {
 				zap.String("dir1", args[0]),
 				zap.String("dir2", args[1]),
 			)
-			// TODO: Implement with validate.Validator
+			logger.Warn("validation not yet implemented")
 			return nil
 		},
 	}
