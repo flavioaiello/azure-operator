@@ -75,7 +75,7 @@ func NewLogger(log *zap.Logger) *Logger {
 
 // CreateRecord creates a new provenance record with environment context.
 func (l *Logger) CreateRecord(scope, specPath string, action Action) Record {
-	hostname, _ := os.Hostname()
+	hostname, _ := os.Hostname() //nolint:errcheck // Empty hostname fallback is handled below
 	user := os.Getenv("USER")
 	if user == "" {
 		user = os.Getenv("USERNAME")

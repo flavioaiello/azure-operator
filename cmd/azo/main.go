@@ -43,9 +43,9 @@ const (
 
 func main() {
 	// Initialize logger.
-	logger, _ = zap.NewDevelopment()
+	logger, _ = zap.NewDevelopment() //nolint:errcheck // Development logger creation rarely fails; panic on nil is acceptable for CLI
 	defer func() {
-		_ = logger.Sync()
+		_ = logger.Sync() //nolint:errcheck // Sync failure on exit is non-critical
 	}()
 
 	if err := newRootCmd().Execute(); err != nil {
@@ -221,7 +221,7 @@ func newDeployCmd() *cobra.Command {
 	}
 	infraCmd.Flags().StringVar(&location, "location", "westeurope", "Azure location")
 	infraCmd.Flags().StringVar(&subscriptionID, "subscription", "", "Azure subscription ID")
-	_ = infraCmd.MarkFlagRequired("subscription")
+	_ = infraCmd.MarkFlagRequired("subscription") //nolint:errcheck // Flag exists, added on previous line
 
 	cmd.AddCommand(infraCmd)
 
@@ -272,7 +272,7 @@ func newDriftCmd() *cobra.Command {
 	showCmd.Flags().StringVar(&specsDir, flagSpecsDir, defaultSpecsDir, descSpecsDir)
 	showCmd.Flags().StringVar(&templatesDir, flagTemplatesDir, defaultTemplatesDir, descTemplatesDir)
 	showCmd.Flags().StringVar(&output, "output", "table", "Output format (table|json|yaml)")
-	_ = showCmd.MarkFlagRequired("domain")
+	_ = showCmd.MarkFlagRequired("domain") //nolint:errcheck // Flag exists, added on previous line
 
 	applyCmd := &cobra.Command{
 		Use:   "apply",
@@ -293,7 +293,7 @@ func newDriftCmd() *cobra.Command {
 	applyCmd.Flags().StringVar(&domain, "domain", "", "Domain to apply")
 	applyCmd.Flags().StringVar(&specsDir, flagSpecsDir, defaultSpecsDir, descSpecsDir)
 	applyCmd.Flags().StringVar(&templatesDir, flagTemplatesDir, defaultTemplatesDir, descTemplatesDir)
-	_ = applyCmd.MarkFlagRequired("domain")
+	_ = applyCmd.MarkFlagRequired("domain") //nolint:errcheck // Flag exists, added on previous line
 
 	cmd.AddCommand(showCmd, applyCmd)
 
@@ -330,7 +330,7 @@ func newApprovalCmd() *cobra.Command {
 		},
 	}
 	approveCmd.Flags().StringVar(&approvalID, "id", "", "Approval ID")
-	_ = approveCmd.MarkFlagRequired("id")
+	_ = approveCmd.MarkFlagRequired("id") //nolint:errcheck // Flag exists, added on previous line
 
 	rejectCmd := &cobra.Command{
 		Use:   "reject",
@@ -344,7 +344,7 @@ func newApprovalCmd() *cobra.Command {
 		},
 	}
 	rejectCmd.Flags().StringVar(&approvalID, "id", "", "Approval ID")
-	_ = rejectCmd.MarkFlagRequired("id")
+	_ = rejectCmd.MarkFlagRequired("id") //nolint:errcheck // Flag exists, added on previous line
 
 	cmd.AddCommand(listCmd, approveCmd, rejectCmd)
 
@@ -381,7 +381,7 @@ func newPauseCmd() *cobra.Command {
 	pauseCmd.Flags().StringVar(&operatorName, "operator", "", "Operator name")
 	pauseCmd.Flags().StringVar(&reason, "reason", "manual", "Pause reason")
 	pauseCmd.Flags().StringVar(&message, "message", "", "Pause message")
-	_ = pauseCmd.MarkFlagRequired("operator")
+	_ = pauseCmd.MarkFlagRequired("operator") //nolint:errcheck // Flag exists, added on previous line
 
 	resumeCmd := &cobra.Command{
 		Use:   "resume",
@@ -395,7 +395,7 @@ func newPauseCmd() *cobra.Command {
 		},
 	}
 	resumeCmd.Flags().StringVar(&operatorName, "operator", "", "Operator name")
-	_ = resumeCmd.MarkFlagRequired("operator")
+	_ = resumeCmd.MarkFlagRequired("operator") //nolint:errcheck // Flag exists, added on previous line
 
 	statusCmd := &cobra.Command{
 		Use:   "status",
@@ -498,7 +498,7 @@ func newMigrateCmd() *cobra.Command {
 		},
 	}
 	promoteCmd.Flags().StringVar(&operator, "operator", "", "Operator to promote")
-	_ = promoteCmd.MarkFlagRequired("operator")
+	_ = promoteCmd.MarkFlagRequired("operator") //nolint:errcheck // Flag exists, added on previous line
 
 	rollbackCmd := &cobra.Command{
 		Use:   "rollback",
@@ -515,7 +515,7 @@ func newMigrateCmd() *cobra.Command {
 		},
 	}
 	rollbackCmd.Flags().StringVar(&operator, "operator", "", "Operator to rollback")
-	_ = rollbackCmd.MarkFlagRequired("operator")
+	_ = rollbackCmd.MarkFlagRequired("operator") //nolint:errcheck // Flag exists, added on previous line
 
 	compareCmd := &cobra.Command{
 		Use:   "compare",

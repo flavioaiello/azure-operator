@@ -17,7 +17,7 @@ const (
 )
 
 func TestNewLogger(t *testing.T) {
-	zapLogger, _ := zap.NewDevelopment()
+	zapLogger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	logger := NewLogger(zapLogger)
 
 	assert.NotNil(t, logger)
@@ -25,7 +25,7 @@ func TestNewLogger(t *testing.T) {
 }
 
 func TestCreateRecord(t *testing.T) {
-	zapLogger, _ := zap.NewDevelopment()
+	zapLogger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	logger := NewLogger(zapLogger)
 
 	// Set up test environment
@@ -98,7 +98,7 @@ func TestChangeSummaryIsEmpty(t *testing.T) {
 
 func TestLogProvenance(t *testing.T) {
 	t.Helper()
-	zapLogger, _ := zap.NewDevelopment()
+	zapLogger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	logger := NewLogger(zapLogger)
 
 	record := Record{
@@ -119,7 +119,7 @@ func TestLogProvenance(t *testing.T) {
 
 func TestLogChangeDetail(t *testing.T) {
 	t.Helper()
-	zapLogger, _ := zap.NewDevelopment()
+	zapLogger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	logger := NewLogger(zapLogger)
 
 	record := Record{

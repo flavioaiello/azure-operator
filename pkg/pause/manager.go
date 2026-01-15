@@ -222,7 +222,7 @@ func (m *Manager) CleanupExpired() int {
 			state.ResumedAt = &resumedAt
 			count++
 
-			_ = m.persistState(name, state)
+			_ = m.persistState(name, state) //nolint:errcheck // Best-effort persistence in cleanup loop
 		}
 	}
 

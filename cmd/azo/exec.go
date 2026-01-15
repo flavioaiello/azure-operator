@@ -10,7 +10,8 @@ import (
 // the environment.
 func NewExecCommand(name string, args ...string) *exec.Cmd {
 	cmd := exec.Command(name, args...)
-	cmd.Dir, _ = os.Getwd()
+	// SECURITY: Getwd failure defaults to empty string (current dir), acceptable for CLI.
+	cmd.Dir, _ = os.Getwd() //nolint:errcheck // Fallback to current directory is acceptable
 	cmd.Env = os.Environ()
 	return cmd
 }

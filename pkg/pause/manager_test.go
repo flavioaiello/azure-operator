@@ -52,7 +52,7 @@ func TestPauseAlreadyPaused(t *testing.T) {
 	dir := t.TempDir()
 	m := NewManager(dir)
 
-	_ = m.Pause("operator1", PauseReasonManual, "", "admin")
+	_ = m.Pause("operator1", PauseReasonManual, "", "admin") //nolint:errcheck // Test setup
 	err := m.Pause("operator1", PauseReasonManual, "", "admin")
 
 	assert.ErrorIs(t, err, ErrAlreadyPaused)
@@ -97,8 +97,8 @@ func TestListPaused(t *testing.T) {
 	dir := t.TempDir()
 	m := NewManager(dir)
 
-	_ = m.Pause("operator1", PauseReasonManual, "", "admin")
-	_ = m.Pause("operator2", PauseReasonMaintenance, "", "admin")
+	_ = m.Pause("operator1", PauseReasonManual, "", "admin")      //nolint:errcheck // Test setup
+	_ = m.Pause("operator2", PauseReasonMaintenance, "", "admin") //nolint:errcheck // Test setup
 
 	paused := m.ListPaused()
 	assert.Len(t, paused, 2)
@@ -111,8 +111,8 @@ func TestCleanupExpired(t *testing.T) {
 	m := NewManager(dir)
 
 	// Pause with short expiry.
-	_ = m.PauseWithExpiry("operator1", PauseReasonManual, "", "admin", 1*time.Millisecond)
-	_ = m.Pause("operator2", PauseReasonManual, "", "admin")
+	_ = m.PauseWithExpiry("operator1", PauseReasonManual, "", "admin", 1*time.Millisecond) //nolint:errcheck // Test setup
+	_ = m.Pause("operator2", PauseReasonManual, "", "admin")                               //nolint:errcheck // Test setup
 
 	time.Sleep(10 * time.Millisecond)
 
