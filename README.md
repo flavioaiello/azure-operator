@@ -14,7 +14,7 @@ A **Python-based, stateless operator framework** for continuously reconciling Az
 [![Pydantic v2](https://img.shields.io/badge/pydantic-v2-E92063.svg)](https://docs.pydantic.dev/)
 [![Azure SDK](https://img.shields.io/badge/Azure%20SDK-Latest-0078D4.svg)](https://github.com/Azure/azure-sdk-for-python)
 [![Security: Secretless](https://img.shields.io/badge/security-secretless-brightgreen.svg)](#secretless-architecture-mandatory)
-[![Tests: 150 passing](https://img.shields.io/badge/tests-150%20passing-brightgreen.svg)](tests/)
+[![Tests: 453 passing](https://img.shields.io/badge/tests-453%20passing-brightgreen.svg)](tests/)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-flavioaiello%2Fazure--operator-blue.svg?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNNCAxOWg0djJINHoiLz48cGF0aCBkPSJNMTAgMTloNHYyaC00eiIvPjxwYXRoIGQ9Ik0xNiAxOWg0djJoLTR6Ii8+PHBhdGggZD0iTTQgMTFoMTZ2Mkg0eiIvPjxwYXRoIGQ9Ik00IDNoMTZ2Mkg0eiIvPjxwYXRoIGQ9Ik04IDN2MTYiLz48cGF0aCBkPSJNMTYgM3YxNiIvPjwvc3ZnPg==)](https://deepwiki.com/flavioaiello/azure-operator)
 
 ---
@@ -39,7 +39,7 @@ A **Python-based, stateless operator framework** for continuously reconciling Az
    - Circuit breaker pattern prevents runaway remediation
 
 2. **Per-Domain Identities**
-   - 19 operators, 19 distinct managed identities
+   - 21 operator types, each with a distinct managed identity
    - Firewall operator can't touch DNS. DNS operator can't touch RBAC.
    - Compromise of one operator doesn't compromise the landing zone
 
@@ -99,11 +99,11 @@ A **Python-based, stateless operator framework** for continuously reconciling Az
 │  │  └───────────────────────────────────────────────────────────┘          ││
 │  └─────────────────────────────────────────────────────────────────────────┘│
 │                                                                              │
-│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐                 │
-│  │  Log Analytics │  │      ACR       │  │   Key Vault    │                 │
-│  │   (Operator    │  │   (Operator    │  │  (Git Creds,   │                 │
-│  │     Logs)      │  │    Images)     │  │    Secrets)    │                 │
-│  └────────────────┘  └────────────────┘  └────────────────┘                 │
+│  ┌────────────────┐  ┌────────────────┐                                     │
+│  │  Log Analytics │  │      ACR       │   Note: Git auth uses HTTPS with  │
+│  │   (Operator    │  │   (Operator    │   ACR-stored PAT or MI-based      │
+│  │     Logs)      │  │    Images)     │   Azure DevOps/GitHub App token   │
+│  └────────────────┘  └────────────────┘                                     │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                     Cross-Subscription RBAC │
@@ -230,7 +230,7 @@ For complete documentation, see [EPAC on GitHub](https://github.com/Azure/enterp
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    CONCERN-BASED (20 Operators)                              │
+│                    CONCERN-BASED (21 Operators)                              │
 │                                                                              │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐   │
 │  │Firewall │ │VPN GW   │ │Express  │ │Bastion  │ │  DNS    │ │Hub VNet │   │
@@ -271,7 +271,7 @@ For complete documentation, see [EPAC on GitHub](https://github.com/Azure/enterp
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    OPERATOR FRAMEWORK APPROACH (16 Operators)                │
+│                    OPERATOR FRAMEWORK APPROACH (21 Operators)                │
 │                                                                              │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐   │
 │  │Firewall │ │ VPN GW  │ │Bastion  │ │   DNS   │ │ Hub Net │ │  vWAN   │   │
@@ -297,7 +297,7 @@ For complete documentation, see [EPAC on GitHub](https://github.com/Azure/enterp
 │  └─────────────────┘                   └─────────────────┘                │
 │                                                                              │
 │  ✅ Loose Coupling:                                                          │
-│  • 16 operators run independently — failure in one doesn't affect others    │
+│  • 21 operators run independently — failure in one doesn't affect others    │
 │  • Each concern reconciles on its own schedule                              │
 │  • Blast radius limited to single domain                                    │
 │  • No shared state files — ARM is the source of truth                       │
@@ -309,7 +309,18 @@ For complete documentation, see [EPAC on GitHub](https://github.com/Azure/enterp
 
 ## Continuous Reconciliation
 
-Each operator runs an **infinite reconciliation loop**:
+Each operator supports two execution modes:
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **Daemon** (default) | Infinite reconciliation loop, runs until stopped | Production — continuous drift detection |
+| **One-shot** | Single reconciliation, then exit | CI/CD — validate and apply once, auto-stop |
+
+Set via `RECONCILE_MODE=daemon` (default) or `RECONCILE_MODE=oneshot`.
+
+### Daemon Mode (Primary)
+
+The default mode runs an **infinite reconciliation loop**:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -413,6 +424,12 @@ This framework enforces a **secretless security model** — there are zero secre
 - `AZURE_USERNAME` / `AZURE_PASSWORD`
 
 See [security.py](src/controller/security.py) for the enforcement implementation.
+
+> **Scope Clarification:** "Secretless" applies to **Azure ARM access** — all Azure API calls use Managed Identity tokens. Git repository access (for spec sync) has two options:
+> 1. **Azure DevOps/GitHub with Managed Identity** — Use workload identity federation to authenticate git-sync with MI tokens (fully secretless)
+> 2. **PAT-based auth** — Store a read-only PAT in ACR or Key Vault as a scoped exception (documented below)
+>
+> The framework enforces secretless for ARM. Git auth is configurable based on your source control platform.
 
 ### Threat Model Considerations
 
@@ -634,7 +651,7 @@ The operator will:
 |-----------|-------------|
 | **No Kubernetes cluster** | ACI is serverless — no cluster management, patching, or scaling |
 | **Native Azure integration** | Managed Identity, VNet integration, Log Analytics built-in |
-| **Cost efficient** | Pay per second of execution, auto-stop on completion |
+| **Cost efficient** | Pay per second; daemon mode runs continuously, job mode auto-stops |
 | **Simple deployment** | Single Bicep deployment creates all operators |
 | **GitOps native** | Git-sync sidecar pulls specs from repository |
 | **Minimal attack surface** | Distroless image, no shell, no package manager |
@@ -809,6 +826,55 @@ az monitor log-analytics query \
 | `LOG_LEVEL` | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
 | `TEMPLATE_DIR` | Path to compiled ARM JSON templates | `./templates` |
 
+### Reconciliation Mode Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RECONCILIATION_MODE` | `observe`, `enforce`, or `protect` | `observe` |
+| `ALLOW_MODE_ESCALATION` | Allow specs to escalate mode | `false` |
+
+### Guardrails Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `KILL_SWITCH` | Emergency stop - blocks all deployments | `false` |
+| `PAUSED_SCOPES` | Comma-separated scopes to pause (e.g., `domain:firewall`) | `""` |
+| `WHATIF_IGNORE_THRESHOLD` | Max WhatIf Ignore changes before failing closed | `10` |
+| `MAX_CREATE_PER_CYCLE` | Max resources to create per cycle | `50` |
+| `MAX_DELETE_PER_CYCLE` | Max resources to delete per cycle | `10` |
+| `MAX_MODIFY_PER_CYCLE` | Max resources to modify per cycle | `100` |
+
+### Approval & Risk Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REQUIRE_APPROVAL_FOR_HIGH_RISK` | Require approval for high-risk changes | `true` |
+| `APPROVAL_TIMEOUT_SECONDS` | Approval request timeout | `3600` |
+| `APPROVAL_WEBHOOK_URL` | Webhook URL for approval notifications | `""` |
+| `AUTO_APPROVE_IF_NO_DELETE` | Auto-approve if no deletions | `false` |
+
+### PR Gate Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PR_GATE_MODE` | `enforce`, `warn`, or `disabled` | `enforce` |
+| `PR_GATE_ENVIRONMENT` | `production`, `staging`, or `development` | `production` |
+| `PR_GATE_MIN_APPROVALS` | Minimum PR approvals required | `1` |
+| `PR_GATE_REQUIRE_CODEOWNERS` | Require CODEOWNERS approval | `true` |
+| `PR_GATE_ALLOWED_BRANCHES` | Comma-separated allowed target branches | `main,master` |
+| `PR_GATE_MAX_COMMIT_AGE_HOURS` | Reject commits older than this | `168` |
+| `PR_GATE_ALLOW_BYPASS` | Allow emergency bypass with ticket | `true` |
+| `PR_GATE_RELAXED_DOMAINS` | Domains that can skip PR validation | `""` |
+
+### Deployment Stacks Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `STACK_PROTECTION_ENABLED` | Enable post-deploy Stack protection | `true` |
+| `STACK_DENY_MODE` | `none`, `denyDelete`, or `denyWriteAndDelete` | `denyWriteAndDelete` |
+| `STACK_ACTION_ON_UNMANAGE` | `delete` or `detach` | `detach` |
+| `STACK_PROTECTION_OPTIONAL_DOMAINS` | Enable for optional domains | `false` |
+
 ### Security Configuration
 
 | Variable | Description | Default |
@@ -816,6 +882,9 @@ az monitor log-analytics query \
 | `REQUIRE_MANAGED_IDENTITY` | Enforce ManagedIdentityCredential; rejects AZURE_CLIENT_SECRET | `true` |
 | `ENABLE_AUDIT_LOGGING` | Enable structured audit logs for all operations | `true` |
 | `MAX_RESOURCES_PER_DEPLOYMENT` | Maximum resources per deployment batch | `50` |
+| `ALLOWED_SUBSCRIPTIONS` | Comma-separated allowed subscription IDs | `""` |
+| `DENIED_SUBSCRIPTIONS` | Comma-separated denied subscription IDs | `""` |
+| `DENY_TENANT_ROOT_GROUP` | Block deployments to Tenant Root Group | `true` |
 
 ### Reliability Features
 
@@ -825,6 +894,138 @@ az monitor log-analytics query \
 | **Operation Timeouts** | All Azure SDK poller operations have explicit timeouts |
 | **Managed Identity Enforcement** | Rejects service principal credentials (AZURE_CLIENT_SECRET) when enabled |
 | **Random Deployment Suffix** | Deployment names include random suffix to prevent conflicts |
+| **Time-Bound Pause** | Pauses auto-expire to prevent forgotten pauses |
+| **Dependency Ordering** | Operators deploy in correct order (firewall after hub-network) |
+| **WhatIf Ignore Threshold** | Fail closed when too many WhatIf Ignore results |
+
+---
+
+## Safety & Governance Features
+
+The operator framework implements multiple layers of safety controls:
+
+### Reconciliation Modes
+
+| Mode | Behavior |
+|------|----------|
+| **observe** | Detect drift only, never apply changes (default) |
+| **enforce** | Auto-fix drift (opt-in per domain) |
+| **protect** | Block changes that violate invariants |
+
+Modes can be configured globally or per-resource via `modeConfig` in specs.
+
+### Confidence Scoring & Approval Gates
+
+High-risk changes require explicit approval:
+
+| Risk Level | Resource Types | Approval Required |
+|------------|----------------|-------------------|
+| **HIGH** | roleAssignments, azureFirewalls, managementGroups, keyVaults | Always |
+| **MEDIUM** | virtualNetworks, storageAccounts, VMs | On DELETE only |
+| **LOW** | diagnosticSettings, DNS records | Never |
+
+### PR-Based Approval Model
+
+With Deployment Stacks deny blocking portal changes, PR approval is the **sole control point**:
+
+- Validates commit comes from approved, merged PR
+- Enforces CODEOWNERS for critical specs (firewall, hub-network)
+- Supports promotion path: dev → staging → production
+- Emergency bypass requires ticket ID (audit logged)
+
+### Deployment Stacks Hybrid
+
+Combines WhatIf preview with Stack post-deploy protection:
+
+```
+1. WhatIf preview (shows exactly what will change)
+2. Confidence scoring (flags risky changes)
+3. Approval gate (blocks high-risk without review)
+4. ARM deployment (applies changes)
+5. Stack wraps resources with Deny settings
+```
+
+| Domain | Stack Enabled | Rationale |
+|--------|---------------|----------|
+| hub-network, firewall, vpn-gateway | ✅ Yes | High blast radius |
+| dns, bastion, vwan | ✅ Yes | Critical connectivity |
+| log-analytics, sentinel | ⚠️ Optional | May need portal access |
+| management-group | ❌ No | Deny not supported at MG scope |
+
+### Ignore Rules & Diff Normalization
+
+Reduce WhatIf noise with semantic equivalence:
+
+```yaml
+# In spec file
+ignoreRules:
+  - path: "properties.tags.lastModified"
+    reason: "System-managed timestamp"
+  - resourceType: "Microsoft.Insights/diagnosticSettings"
+    path: "properties.workspaceId"
+    reason: "Tolerate workspace ID format differences"
+```
+
+Built-in normalization handles:
+- Empty equivalence: `[]` ≡ `{}` ≡ `null`
+- Boolean normalization: `"true"` ≡ `true`
+- Case-insensitive SKU names
+- URL normalization (trailing slashes, scheme case)
+
+### Operator Dependencies
+
+Operators deploy in correct order:
+
+```
+hub-network → firewall, vpn-gateway, bastion
+log-analytics → sentinel, defender
+management-group → role, policy
+```
+
+Dependencies are enforced via `depends_on` in specs or auto-detected from `KNOWN_DEPENDENCIES`.
+
+---
+
+## Controller Module Reference
+
+The operator framework consists of these Python modules in `src/controller/`:
+
+| Module | Purpose | Key Classes/Functions |
+|--------|---------|----------------------|
+| **reconciler.py** | Core reconciliation loop | `Reconciler`, `reconcile_once()` |
+| **config.py** | Configuration management | `Config`, `ReconciliationMode` |
+| **models.py** | Pydantic spec models | `BaseSpec`, domain-specific specs |
+| **spec_loader.py** | YAML spec loading/validation | `load_spec()`, `validate_spec()` |
+| **guardrails.py** | Safety limits & kill switch | `check_guardrails()`, rate limits |
+| **security.py** | Secretless enforcement | `enforce_secretless_architecture()` |
+| **approval.py** | Confidence scoring & gates | `RiskAssessor`, `ApprovalGate`, `ConfidenceLevel` |
+| **pr_gate.py** | PR-based approval validation | `PRGateValidator`, `CodeOwner`, `PromotionState` |
+| **pause.py** | Time-bound operator pause | `PauseManager`, `EmergencyWindow` |
+| **dependency.py** | Operator ordering | `DependencyGraph`, `DependencyChecker` |
+| **ignore_rules.py** | WhatIf noise filtering | `IgnoreRule`, `IgnoreRulesEvaluator` |
+| **diff_normalizer.py** | Semantic equivalence | `DiffNormalizer`, `NormalizationType` |
+| **resource_modes.py** | Per-resource mode overrides | `ModeResolver`, `ResourceModeOverride` |
+| **deployment_stacks.py** | Post-deploy Stack protection | `DeploymentStackManager`, `StackProtectionConfig` |
+| **resource_graph.py** | Fast drift detection | `ResourceGraphClient`, `query_resources()` |
+| **provenance.py** | Audit trail & logging | `ReconcileProvenance`, `ProvenanceLogger` |
+| **bootstrap.py** | Identity cascade setup | `BootstrapReconciler` |
+| **cli.py** | `azo` CLI commands | Click-based CLI |
+
+### Test Coverage
+
+453 tests covering all modules:
+
+| Test File | Coverage |
+|-----------|----------|
+| `test_approval.py` | Confidence scoring, approval gates |
+| `test_pr_gate.py` | PR validation, CODEOWNERS, promotion |
+| `test_pause.py` | Time-bound pause, emergency windows |
+| `test_dependency.py` | Dependency graph, ordering |
+| `test_diff_normalizer.py` | Normalization rules, equivalence |
+| `test_resource_modes.py` | Per-resource mode overrides |
+| `test_deployment_stacks.py` | Stack configuration, naming |
+| `test_guardrails.py` | Rate limits, kill switch, scopes |
+| `test_whatif_safety_scenarios.py` | WhatIf value proposition |
 
 ### Spec File Format
 

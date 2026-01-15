@@ -523,10 +523,12 @@ class TestALZManagementGroupScope:
 
     @pytest.mark.asyncio
     async def test_management_group_whatif(
-        self, mg_config: Config, mg_templates: Path, mg_specs: Path
+        self, mg_config: Config, mg_templates: Path, mg_specs: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test WhatIf at management group scope detects hierarchy changes."""
         _ = mg_templates, mg_specs  # Used to trigger fixture setup
+        # Disable approval gates for this test - we want to verify deployment flow
+        monkeypatch.setenv("REQUIRE_APPROVAL_FOR_HIGH_RISK", "false")
         with MockAzureContext() as ctx:
             reconciler = Reconciler(mg_config)
             result = await reconciler._reconcile_once()

@@ -112,12 +112,27 @@ class GraphQueryResult:
         resources: Current resources in scope
         has_changes: Whether any relevant changes were detected
         query_time_seconds: Time taken for queries
+        scope_incomplete: True if query could not cover entire scope (e.g., MG scope)
     """
 
     recent_changes: list[ResourceChange]
     resources: list[ResourceInfo]
     has_changes: bool
     query_time_seconds: float
+    scope_incomplete: bool = False
+
+    @property
+    def can_skip_whatif(self) -> bool:
+        """Determine if WhatIf can be safely skipped based on this result.
+
+        SECURITY: Fast-path skip is only safe when:
+        1. No changes were detected
+        2. The query covered the complete scope (not incomplete)
+
+        For management group scope, we cannot enumerate all subscriptions,
+        so scope_incomplete=True and WhatIf must always run.
+        """
+        return not self.has_changes and not self.scope_incomplete
 
 
 class ResourceGraphQuerier:
@@ -188,6 +203,23 @@ class ResourceGraphQuerier:
         # Determine if there are relevant changes
         has_changes = len(recent_changes) > 0
 
+        # SECURITY: Mark scope as incomplete for management group deployments.
+        # We cannot enumerate all subscriptions under an MG without additional
+        # permissions, so Resource Graph queries only cover the configured
+        # subscription. This means fast-path skip is NOT safe for MG scope.
+        scope_incomplete = self._config.scope == DeploymentScope.MANAGEMENT_GROUP
+
+        if scope_incomplete:
+            logger.warning(
+                "Resource Graph scope incomplete for management group deployment. "
+                "WhatIf will always run to ensure complete drift detection.",
+                extra={
+                    "domain": self._config.domain,
+                    "scope": self._config.scope.value,
+                    "queried_subscription": self._config.subscription_id,
+                },
+            )
+
         logger.info(
             "Resource Graph check complete",
             extra={
@@ -195,6 +227,7 @@ class ResourceGraphQuerier:
                 "changes_found": len(recent_changes),
                 "resources_found": len(resources),
                 "query_time_seconds": round(query_time, 2),
+                "scope_incomplete": scope_incomplete,
             },
         )
 
@@ -203,6 +236,7 @@ class ResourceGraphQuerier:
             resources=resources,
             has_changes=has_changes,
             query_time_seconds=query_time,
+            scope_incomplete=scope_incomplete,
         )
 
     async def _query_recent_changes(

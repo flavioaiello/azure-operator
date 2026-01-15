@@ -16,6 +16,9 @@ from pydantic import BaseModel, Field, field_validator
 # Base Models
 # =============================================================================
 
+# Forward reference for SpecModeConfig to avoid circular import
+# Actual import happens at runtime in resource_modes.py
+
 
 class BaseSpec(BaseModel):
     """Base specification with common fields."""
@@ -25,6 +28,20 @@ class BaseSpec(BaseModel):
     location: str | None = None
     resource_group_name: str | None = Field(None, alias="resourceGroupName")
     tags: dict[str, str] = Field(default_factory=dict)
+
+    # Dependency ordering - list of domain names that must deploy first
+    # Example: depends_on: ["hub-network", "log-analytics"]
+    depends_on: list[str] = Field(default_factory=list, alias="dependsOn")
+
+    # Per-resource mode overrides
+    # Allows spec to declare mode preferences and resource-level overrides
+    # Example:
+    #   modeConfig:
+    #     defaultMode: observe
+    #     overrides:
+    #       - resourceTypes: ["Microsoft.Authorization/roleAssignments"]
+    #         mode: protect
+    mode_config: Any | None = Field(None, alias="modeConfig")
 
     def to_arm_parameters(self) -> dict[str, Any]:
         """Convert spec to ARM template parameters format."""
@@ -1223,15 +1240,122 @@ class PolicySpec(BaseSpec):
 # Bootstrap Cascade Domain
 # =============================================================================
 
+# SECURITY: High-privilege roles that require explicit allowlisting
+# These roles grant broad permissions and should not be assigned without
+# explicit configuration to prevent privilege escalation
+HIGH_PRIVILEGE_ROLES: frozenset[str] = frozenset({
+    "Owner",
+    "User Access Administrator",
+    "Contributor",  # Too broad for most operators
+})
+
+# SECURITY: Scope patterns that indicate overly broad assignments
+# Assignments at these scopes are blocked by default
+DENIED_SCOPE_PATTERNS: tuple[str, ...] = (
+    "/",  # Tenant root (just a slash)
+    "/providers/Microsoft.Management/managementGroups/",  # Bare MG without ID
+)
+
+# SECURITY: Root management group scope patterns to deny
+ROOT_MG_PATTERNS: tuple[str, ...] = (
+    "Tenant Root Group",
+    "Root Management Group",
+)
+
 
 class RoleAssignmentDefinition(BaseModel):
-    """RBAC role assignment definition for an operator identity."""
+    """RBAC role assignment definition for an operator identity.
 
-    model_config = {"extra": "ignore"}
+    SECURITY: Validates that role assignments follow least-privilege principles:
+    - Denies high-privilege roles (Owner, UAA, Contributor) by default
+    - Denies assignments at tenant root or bare management group scopes
+    - Requires explicit scope (subscription, RG, or resource level)
+    """
+
+    model_config = {"extra": "ignore", "populate_by_name": True}
 
     role_definition_name: Annotated[str, Field(min_length=1, alias="roleDefinitionName")]
     scope: Annotated[str, Field(min_length=1)]
     description: str | None = None
+
+    @field_validator("role_definition_name")
+    @classmethod
+    def validate_role_not_high_privilege(cls, v: str) -> str:
+        """Deny high-privilege roles unless explicitly allowed.
+
+        SECURITY: Operators should use least-privilege roles.
+        Owner, UAA, and Contributor are too broad for automated operators.
+
+        To override, set ALLOW_HIGH_PRIVILEGE_ROLES=true in bootstrap environment.
+        """
+        import os
+
+        allow_high_priv = os.environ.get("ALLOW_HIGH_PRIVILEGE_ROLES", "").lower() in (
+            "true", "1", "yes"
+        )
+
+        if not allow_high_priv and v in HIGH_PRIVILEGE_ROLES:
+            raise ValueError(
+                f"Role '{v}' is a high-privilege role and is denied by default. "
+                f"Use a more specific role (e.g., 'Network Contributor', 'Reader') "
+                f"or set ALLOW_HIGH_PRIVILEGE_ROLES=true to override."
+            )
+        return v
+
+    @field_validator("scope")
+    @classmethod
+    def validate_scope_not_too_broad(cls, v: str) -> str:
+        """Deny overly broad scopes that could lead to privilege escalation.
+
+        SECURITY: Scopes must be specific (subscription, RG, or resource).
+        Tenant root and bare management group scopes are denied.
+        """
+        import os
+
+        allow_broad = os.environ.get("ALLOW_BROAD_RBAC_SCOPES", "").lower() in (
+            "true", "1", "yes"
+        )
+
+        if allow_broad:
+            return v
+
+        # Check for denied patterns
+        scope_lower = v.lower().strip()
+
+        # Deny bare slash (tenant root)
+        if scope_lower == "/" or scope_lower == "":
+            raise ValueError(
+                "Role assignment scope '/' (tenant root) is denied. "
+                "Use a subscription or resource group scope instead."
+            )
+
+        # Deny root management group patterns
+        for root_pattern in ROOT_MG_PATTERNS:
+            if root_pattern.lower() in scope_lower:
+                raise ValueError(
+                    f"Role assignment at root management group '{root_pattern}' is denied. "
+                    f"Scope to a child management group or subscription instead."
+                )
+
+        # Validate scope format - must start with /subscriptions/ or /providers/Microsoft.Management/managementGroups/{id}
+        if not scope_lower.startswith("/subscriptions/"):
+            # Check if it's a valid management group scope with an ID
+            if scope_lower.startswith("/providers/microsoft.management/managementgroups/"):
+                # Extract the MG ID portion
+                parts = v.split("/")
+                # Pattern: /providers/Microsoft.Management/managementGroups/{mgId}
+                if len(parts) < 5 or not parts[4]:
+                    raise ValueError(
+                        "Management group scope must include the management group ID. "
+                        "Example: /providers/Microsoft.Management/managementGroups/mg-platform"
+                    )
+            else:
+                raise ValueError(
+                    f"Invalid scope format: '{v}'. "
+                    f"Scope must start with '/subscriptions/' or be a valid management group path."
+                )
+
+        return v
 
 
 class OperatorIdentityConfig(BaseModel):
@@ -1240,6 +1364,8 @@ class OperatorIdentityConfig(BaseModel):
     Each operator gets:
     - A User-Assigned Managed Identity (UAMI)
     - One or more RBAC role assignments scoped to specific resources
+
+    SECURITY: Role assignments are validated to ensure least-privilege.
     """
 
     model_config = {"extra": "ignore"}
@@ -1269,7 +1395,6 @@ class OperatorIdentityConfig(BaseModel):
         if v not in valid_scopes:
             raise ValueError(f"scope must be one of {valid_scopes}")
         return v
-
 
 class BootstrapSpec(BaseSpec):
     """Bootstrap cascade specification.

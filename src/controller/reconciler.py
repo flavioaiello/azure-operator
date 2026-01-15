@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import secrets
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -47,6 +48,11 @@ from azure.mgmt.resource.resources.models import (
     WhatIfOperationResult,
 )
 
+from .approval import (
+    ApprovalConfig,
+    ApprovalGate,
+    DeploymentRiskAssessment,
+)
 from .config import (
     MAX_DEPLOYMENT_NAME_LENGTH,
     MAX_DEPLOYMENT_RETRIES,
@@ -55,6 +61,11 @@ from .config import (
     Config,
     DeploymentScope,
     ReconciliationMode,
+)
+from .dependency import (
+    DependencyChecker,
+    DependencyConfig,
+    UnsatisfiedDependencyError,
 )
 from .guardrails import (
     ConcurrencyViolation,
@@ -67,6 +78,12 @@ from .guardrails import (
     ScopeViolation,
 )
 from .ignore_rules import IgnoreRulesConfig, IgnoreRulesEvaluator
+from .pause import (
+    PauseConfig,
+    PauseManager,
+    PauseReason,
+    check_pause_with_manager,
+)
 from .provenance import (
     ChangeProvenanceSummary,
     get_provenance_logger,
@@ -97,6 +114,40 @@ class ChangeType(str, Enum):
     UNSUPPORTED = "Unsupported"
 
 
+def _parse_resource_type_from_id(resource_id: str | None) -> str:
+    """Extract resource type from Azure resource ID.
+
+    Azure resource IDs follow the pattern:
+    /subscriptions/{sub}/resourceGroups/{rg}/providers/{namespace}/{type}/{name}
+
+    Args:
+        resource_id: Azure resource ID.
+
+    Returns:
+        Resource type (e.g., "Microsoft.Network/virtualNetworks") or "unknown".
+    """
+    if not resource_id:
+        return "unknown"
+
+    try:
+        parts = resource_id.split("/providers/")
+        if len(parts) < 2:
+            return "unknown"
+
+        # The provider portion is like: Microsoft.Network/virtualNetworks/myVnet
+        # We need: Microsoft.Network/virtualNetworks
+        provider_portion = parts[-1]
+        segments = provider_portion.split("/")
+
+        if len(segments) < 2:
+            return "unknown"
+
+        # Resource type is namespace + type: Microsoft.Network/virtualNetworks
+        return f"{segments[0]}/{segments[1]}"
+    except (IndexError, AttributeError):
+        return "unknown"
+
+
 class _EarlyReturnSignal(Exception):
     """Internal signal for early returns that should still log provenance.
 
@@ -118,6 +169,9 @@ class ReconcileResult:
     drift_found: bool = False
     changes_applied: int = 0
     changes_blocked: int = 0  # For PROTECT mode: drift detected but blocked
+    approval_required: bool = False  # True if waiting for approval
+    approval_request_id: str | None = None  # ID of pending approval
+    risk_assessment: DeploymentRiskAssessment | None = None  # Risk details
     error: Exception | None = None
 
     @property
@@ -189,6 +243,20 @@ class Reconciler:
         # Ignore rules for filtering WhatIf noise
         self._ignore_rules = IgnoreRulesEvaluator(IgnoreRulesConfig.from_env())
 
+        # Approval gate for risky changes
+        # Assesses risk and requires approval for high-risk deployments
+        self._approval_gate = ApprovalGate(ApprovalConfig.from_env())
+
+        # Dependency checker for operator ordering
+        self._dependency_checker = DependencyChecker(
+            config=DependencyConfig.from_env(),
+            credential=self._credential,
+        )
+
+        # Time-bound pause manager with auto-resume
+        # Replaces simple PAUSED_SCOPES string list with proper pause management
+        self._pause_manager = PauseManager(PauseConfig.from_env())
+
         self._shutdown_event = asyncio.Event()
 
         # Circuit breaker state
@@ -199,6 +267,56 @@ class Reconciler:
     def config(self) -> Config:
         """Get the reconciler configuration."""
         return self._config
+
+    @property
+    def pause_manager(self) -> PauseManager:
+        """Get the pause manager for time-bound pauses.
+
+        Use this to create, resume, or query pauses:
+            reconciler.pause_manager.create_pause(
+                scope="domain:firewall",
+                duration_seconds=3600,
+                reason=PauseReason.MAINTENANCE,
+                initiated_by="admin@example.com"
+            )
+        """
+        return self._pause_manager
+
+    def pause_domain(
+        self,
+        duration_seconds: int = 3600,
+        reason: PauseReason = PauseReason.MAINTENANCE,
+        initiated_by: str = "unknown",
+        notes: str = "",
+    ) -> None:
+        """Pause this operator's domain for a specified duration.
+
+        Convenience method to pause the current operator's domain.
+
+        Args:
+            duration_seconds: How long to pause (default 1 hour).
+            reason: Why the pause is being initiated.
+            initiated_by: Identity creating the pause.
+            notes: Optional notes.
+        """
+        self._pause_manager.create_pause(
+            scope=f"domain:{self._config.domain}",
+            duration_seconds=duration_seconds,
+            reason=reason,
+            initiated_by=initiated_by,
+            notes=notes,
+        )
+
+    def resume_domain(self, resumed_by: str = "unknown") -> bool:
+        """Resume this operator's domain if paused.
+
+        Returns:
+            True if domain was paused and is now resumed.
+        """
+        return self._pause_manager.resume(
+            scope=f"domain:{self._config.domain}",
+            resumed_by=resumed_by,
+        )
 
     async def run(self) -> None:
         """Run the reconciliation loop until shutdown.
@@ -312,12 +430,30 @@ class Reconciler:
             self._guardrails.check_scope(scope_type, scope_value)
 
         # Check if domain or scope is paused (less severe than kill switch)
+        # Check both the old PAUSED_SCOPES and the new PauseManager
         if scope_value:
+            # Check legacy PAUSED_SCOPES (still supported)
             self._guardrails.check_pause(
                 domain=self._config.domain,
                 scope_type=scope_type,
                 scope_value=scope_value,
             )
+
+            # Check time-bound pauses via PauseManager (preferred)
+            is_paused, pause_entry = check_pause_with_manager(
+                self._pause_manager,
+                domain=self._config.domain,
+                scope_type=scope_type,
+                scope_value=scope_value,
+            )
+            if is_paused and pause_entry:
+                remaining = pause_entry.remaining_seconds()
+                raise ScopePauseViolation(
+                    f"Scope is paused via PauseManager. "
+                    f"Reason: {pause_entry.reason.value}. "
+                    f"Expires in {remaining:.0f}s. "
+                    f"Use pause_manager.resume() to resume early."
+                )
 
     def _get_scope_for_guardrails(self) -> tuple[str, str]:
         """Get scope type and value for guardrail checks.
@@ -380,13 +516,36 @@ class Reconciler:
             spec = load_spec(self._config.specs_dir, self._config.domain)
             params = spec.to_arm_parameters()
 
+            # DEPENDENCY: Check if dependencies are satisfied before proceeding
+            if spec.depends_on:
+                deps_satisfied, unsatisfied = self._dependency_checker.check_dependencies(
+                    domain=self._config.domain,
+                    depends_on=spec.depends_on,
+                    subscription_id=self._config.subscription_id,
+                    management_group_id=self._config.management_group_id,
+                )
+                if not deps_satisfied:
+                    raise UnsatisfiedDependencyError(
+                        f"Dependencies not satisfied for '{self._config.domain}': {unsatisfied}"
+                    )
+                logger.info(
+                    "All dependencies satisfied",
+                    extra={
+                        "domain": self._config.domain,
+                        "depends_on": spec.depends_on,
+                    },
+                )
+
             # FAST PATH: Check Resource Graph for recent changes
             skip_whatif = False
             if self._graph_querier is not None:
                 try:
                     graph_result = await self._graph_querier.check_for_changes()
 
-                    if not graph_result.has_changes:
+                    # SECURITY: Use can_skip_whatif which checks BOTH:
+                    # 1. No changes detected
+                    # 2. Scope is complete (not MG scope with partial visibility)
+                    if graph_result.can_skip_whatif:
                         logger.info(
                             "No recent changes detected via Resource Graph, skipping WhatIf",
                             extra={
@@ -395,8 +554,20 @@ class Reconciler:
                             },
                         )
                         skip_whatif = True
+                    elif graph_result.scope_incomplete:
+                        # MG scope - cannot skip WhatIf even if no changes detected
+                        logger.info(
+                            "Resource Graph scope incomplete, WhatIf required",
+                            extra={
+                                "domain": self._config.domain,
+                                "scope": self._config.scope.value,
+                                "changes_found": len(graph_result.recent_changes),
+                            },
+                        )
+                        if graph_result.recent_changes:
+                            self._log_change_attribution(graph_result.recent_changes)
                     else:
-                        # Log change attribution for audit
+                        # Changes detected - log attribution for audit
                         self._log_change_attribution(graph_result.recent_changes)
 
                 except HttpResponseError as e:
@@ -444,6 +615,32 @@ class Reconciler:
                 result.error = RuntimeError(error_msg)
                 result.end_time = datetime.now(UTC)
                 raise _EarlyReturnSignal()
+
+            # RISK ASSESSMENT: Evaluate risk of all changes
+            change_tuples = [
+                (
+                    change.resource_id or "",
+                    _parse_resource_type_from_id(change.resource_id),
+                    change.change_type or "unknown",
+                )
+                for change in significant_changes
+            ]
+            risk_assessment = self._approval_gate.assessor.assess_deployment(
+                domain=self._config.domain,
+                changes=change_tuples,
+            )
+            result.risk_assessment = risk_assessment
+
+            logger.info(
+                "Risk assessment complete",
+                extra={
+                    "domain": self._config.domain,
+                    "overall_confidence": risk_assessment.overall_confidence.value,
+                    "requires_approval": risk_assessment.requires_approval,
+                    "high_risk_count": risk_assessment.high_risk_count,
+                    "medium_risk_count": risk_assessment.medium_risk_count,
+                },
+            )
 
             logger.info(
                 "Drift detected",
@@ -495,6 +692,43 @@ class Reconciler:
 
                 case ReconciliationMode.ENFORCE:
                     # Auto-remediate drift
+                    # Check if approval is required for high-risk changes
+                    if risk_assessment.requires_approval:
+                        # Generate approval request ID
+                        approval_request_id = secrets.token_urlsafe(16)
+                        # Generate a pending deployment name for the approval request
+                        timestamp = int(time.time())
+                        random_suffix = random.randint(1000, 9999)
+                        reserved_len = len(DEPLOYMENT_NAME_PREFIX) + 17
+                        max_domain_len = MAX_DEPLOYMENT_NAME_LENGTH - reserved_len
+                        truncated_domain = self._config.domain[:max_domain_len]
+                        pending_deployment_name = (
+                            f"{DEPLOYMENT_NAME_PREFIX}-{truncated_domain}-{timestamp}-{random_suffix}"
+                        )
+
+                        # Create approval request and block
+                        self._approval_gate.create_approval_request(
+                            request_id=approval_request_id,
+                            domain=self._config.domain,
+                            deployment_name=pending_deployment_name,
+                            risk_assessment=risk_assessment,
+                        )
+
+                        result.approval_required = True
+                        result.approval_request_id = approval_request_id
+
+                        logger.warning(
+                            "ENFORCE mode: approval required for high-risk changes",
+                            extra={
+                                "domain": self._config.domain,
+                                "change_count": len(significant_changes),
+                                "approval_request_id": approval_request_id,
+                                "high_risk_count": risk_assessment.high_risk_count,
+                            },
+                        )
+                        result.end_time = datetime.now(UTC)
+                        raise _EarlyReturnSignal()
+
                     logger.info(
                         "ENFORCE mode: applying drift remediation",
                         extra={
@@ -534,6 +768,9 @@ class Reconciler:
 
                 # Record actual applied count
                 result.changes_applied = len(significant_changes)
+
+                # DEPENDENCY: Mark this domain as satisfied for dependent operators
+                self._dependency_checker.mark_satisfied(self._config.domain)
             finally:
                 # CONCURRENCY: Always release scope lock
                 if scope_value:
@@ -560,6 +797,13 @@ class Reconciler:
             # Concurrency violation - another deployment is in progress
             logger.warning(
                 "Concurrency violation, deployment skipped",
+                extra={"domain": self._config.domain, "reason": str(e)},
+            )
+            result.error = e
+        except UnsatisfiedDependencyError as e:
+            # Dependencies not satisfied - skip this cycle
+            logger.warning(
+                "Dependencies not satisfied, deployment skipped",
                 extra={"domain": self._config.domain, "reason": str(e)},
             )
             result.error = e
@@ -982,18 +1226,29 @@ class Reconciler:
 
     def _log_result(self, result: ReconcileResult) -> None:
         """Log reconciliation result with structured data."""
-        extra = {
+        extra: dict[str, Any] = {
             "domain": result.domain,
             "mode": result.mode.value,
             "duration_seconds": result.duration_seconds,
             "drift_found": result.drift_found,
             "changes_applied": result.changes_applied,
             "changes_blocked": result.changes_blocked,
+            "approval_required": result.approval_required,
         }
+
+        # Include risk assessment if available
+        if result.risk_assessment is not None:
+            extra["confidence"] = result.risk_assessment.overall_confidence.value
+            extra["high_risk_count"] = result.risk_assessment.high_risk_count
+
+        if result.approval_request_id is not None:
+            extra["approval_request_id"] = result.approval_request_id
 
         if result.error is not None:
             extra["error"] = str(result.error)
             logger.error("Reconciliation failed", extra=extra)
+        elif result.approval_required:
+            logger.warning("Reconciliation: waiting for approval", extra=extra)
         elif result.changes_blocked > 0:
             logger.warning("Reconciliation: drift blocked (PROTECT mode)", extra=extra)
         else:

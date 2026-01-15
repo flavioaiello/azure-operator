@@ -286,3 +286,193 @@ class TestSpecRegistry:
             get_spec_class("security")  # Use defender, keyvault, sentinel
         with pytest.raises(ValueError):
             get_spec_class("identity")  # Use role operator
+
+
+class TestRoleAssignmentDefinitionSecurity:
+    """Tests for RoleAssignmentDefinition security validators.
+    
+    These tests verify that bootstrap RBAC definitions enforce:
+    1. No high-privilege roles (Owner, User Access Administrator, Contributor)
+    2. No overly broad scopes (tenant root, root management group)
+    """
+
+    def test_deny_owner_role(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that Owner role is denied by default."""
+        from controller.models import RoleAssignmentDefinition
+
+        # Ensure env override is not set
+        monkeypatch.delenv("ALLOW_HIGH_PRIVILEGE_ROLES", raising=False)
+
+        with pytest.raises(ValidationError) as exc_info:
+            RoleAssignmentDefinition(
+                scope="/subscriptions/00000000-1111-2222-3333-444444444444",
+                role_definition_name="Owner",
+            )
+
+        assert "Owner" in str(exc_info.value)
+        assert "high-privilege" in str(exc_info.value).lower()
+
+    def test_deny_user_access_administrator_role(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that User Access Administrator role is denied by default."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.delenv("ALLOW_HIGH_PRIVILEGE_ROLES", raising=False)
+
+        with pytest.raises(ValidationError) as exc_info:
+            RoleAssignmentDefinition(
+                scope="/subscriptions/00000000-1111-2222-3333-444444444444",
+                role_definition_name="User Access Administrator",
+            )
+
+        assert "User Access Administrator" in str(exc_info.value)
+
+    def test_deny_contributor_role(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that Contributor role is denied by default."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.delenv("ALLOW_HIGH_PRIVILEGE_ROLES", raising=False)
+
+        with pytest.raises(ValidationError) as exc_info:
+            RoleAssignmentDefinition(
+                scope="/subscriptions/00000000-1111-2222-3333-444444444444",
+                role_definition_name="Contributor",
+            )
+
+        assert "Contributor" in str(exc_info.value)
+
+    def test_allow_high_privilege_with_env_override(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that env override allows high-privilege roles."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.setenv("ALLOW_HIGH_PRIVILEGE_ROLES", "true")
+
+        # Should not raise with override
+        role = RoleAssignmentDefinition(
+            scope="/subscriptions/00000000-1111-2222-3333-444444444444",
+            role_definition_name="Owner",
+        )
+        assert role.role_definition_name == "Owner"
+
+    def test_allow_least_privilege_roles(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that least-privilege roles are allowed."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.delenv("ALLOW_HIGH_PRIVILEGE_ROLES", raising=False)
+
+        # Reader role should be allowed
+        role = RoleAssignmentDefinition(
+            scope="/subscriptions/00000000-1111-2222-3333-444444444444",
+            role_definition_name="Reader",
+        )
+        assert role.role_definition_name == "Reader"
+
+    def test_deny_tenant_root_scope(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that tenant root scope is denied by default."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.delenv("ALLOW_BROAD_RBAC_SCOPES", raising=False)
+
+        with pytest.raises(ValidationError) as exc_info:
+            RoleAssignmentDefinition(
+                scope="/",
+                role_definition_name="Reader",
+            )
+
+        # The validation catches the '/' as tenant root
+        assert "tenant root" in str(exc_info.value).lower() or "denied" in str(exc_info.value).lower()
+
+    def test_deny_root_management_group_scope(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that root management group scope is denied by default."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.delenv("ALLOW_BROAD_RBAC_SCOPES", raising=False)
+
+        # Test with "Tenant Root Group" pattern in scope
+        with pytest.raises(ValidationError) as exc_info:
+            RoleAssignmentDefinition(
+                scope="/providers/Microsoft.Management/managementGroups/Tenant Root Group",
+                role_definition_name="Reader",
+            )
+
+        # Check it was rejected for root MG
+        assert "root" in str(exc_info.value).lower() or "denied" in str(exc_info.value).lower()
+
+    def test_allow_subscription_scope(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that subscription scope is allowed."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.delenv("ALLOW_BROAD_RBAC_SCOPES", raising=False)
+
+        role = RoleAssignmentDefinition(
+            scope="/subscriptions/00000000-1111-2222-3333-444444444444",
+            role_definition_name="Reader",
+        )
+        assert role.scope == "/subscriptions/00000000-1111-2222-3333-444444444444"
+
+    def test_allow_resource_group_scope(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that resource group scope is allowed."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.delenv("ALLOW_BROAD_RBAC_SCOPES", raising=False)
+        monkeypatch.delenv("ALLOW_HIGH_PRIVILEGE_ROLES", raising=False)
+
+        role = RoleAssignmentDefinition(
+            scope="/subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/rg-test",
+            role_definition_name="Reader",
+        )
+        assert "resourceGroups" in role.scope
+
+    def test_allow_broad_scope_with_env_override(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that env override allows broad scopes."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.setenv("ALLOW_BROAD_RBAC_SCOPES", "true")
+
+        # Root scope should be allowed with override
+        role = RoleAssignmentDefinition(
+            scope="/",
+            role_definition_name="Reader",
+        )
+        assert role.scope == "/"
+
+    def test_child_management_group_allowed(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that child management groups are allowed."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.delenv("ALLOW_BROAD_RBAC_SCOPES", raising=False)
+
+        # Child MG (not matching root patterns)
+        role = RoleAssignmentDefinition(
+            scope="/providers/Microsoft.Management/managementGroups/mg-landing-zones",
+            role_definition_name="Reader",
+        )
+        assert "mg-landing-zones" in role.scope
+
+    def test_network_contributor_allowed(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that specific service roles are allowed (least privilege)."""
+        from controller.models import RoleAssignmentDefinition
+
+        monkeypatch.delenv("ALLOW_HIGH_PRIVILEGE_ROLES", raising=False)
+
+        # Network Contributor is a service-specific role, not high-privilege
+        role = RoleAssignmentDefinition(
+            scope="/subscriptions/00000000-1111-2222-3333-444444444444",
+            role_definition_name="Network Contributor",
+        )
+        assert role.role_definition_name == "Network Contributor"
