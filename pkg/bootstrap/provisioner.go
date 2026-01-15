@@ -91,8 +91,8 @@ type OperatorConfig struct {
 	DependsOn []string `yaml:"dependsOn"`
 }
 
-// Reconciler handles bootstrap operations.
-type Reconciler struct {
+// Provisioner handles bootstrap operations.
+type Provisioner struct {
 	config           *Config
 	logger           *zap.Logger
 	credential       azcore.TokenCredential
@@ -101,12 +101,12 @@ type Reconciler struct {
 	resourcesClient  *armresources.Client
 }
 
-// NewReconciler creates a new bootstrap reconciler.
-func NewReconciler(
+// NewProvisioner creates a new bootstrap reconciler.
+func NewProvisioner(
 	cfg *Config,
 	logger *zap.Logger,
 	cred azcore.TokenCredential,
-) (*Reconciler, error) {
+) (*Provisioner, error) {
 	identitiesClient, err := armmsi.NewUserAssignedIdentitiesClient(cfg.SubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identities client: %w", err)
@@ -122,7 +122,7 @@ func NewReconciler(
 		return nil, fmt.Errorf("failed to create resources client: %w", err)
 	}
 
-	return &Reconciler{
+	return &Provisioner{
 		config:           cfg,
 		logger:           logger,
 		credential:       cred,
@@ -133,14 +133,14 @@ func NewReconciler(
 }
 
 // ProvisionIdentity creates or updates a managed identity.
-func (r *Reconciler) ProvisionIdentity(
+func (p *Provisioner) ProvisionIdentity(
 	ctx context.Context,
 	name string,
 	resourceGroup string,
 	location string,
 	tags map[string]string,
 ) (*OperatorIdentity, error) {
-	r.logger.Info("Provisioning managed identity",
+	p.logger.Info("Provisioning managed identity",
 		zap.String("name", name),
 		zap.String("resourceGroup", resourceGroup),
 	)
@@ -150,7 +150,7 @@ func (r *Reconciler) ProvisionIdentity(
 		Tags:     toStringPtrMap(tags),
 	}
 
-	resp, err := r.identitiesClient.CreateOrUpdate(ctx, resourceGroup, name, identity, nil)
+	resp, err := p.identitiesClient.CreateOrUpdate(ctx, resourceGroup, name, identity, nil)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrIdentityCreationFailed, err)
 	}
@@ -172,7 +172,7 @@ func (r *Reconciler) ProvisionIdentity(
 		result.ResourceID = *resp.ID
 	}
 
-	r.logger.Info("Managed identity provisioned",
+	p.logger.Info("Managed identity provisioned",
 		zap.String("name", name),
 		zap.String("principalId", result.PrincipalID),
 	)
@@ -181,11 +181,11 @@ func (r *Reconciler) ProvisionIdentity(
 }
 
 // AssignRole creates an RBAC role assignment.
-func (r *Reconciler) AssignRole(
+func (p *Provisioner) AssignRole(
 	ctx context.Context,
 	assignment RoleAssignment,
 ) error {
-	r.logger.Info("Assigning RBAC role",
+	p.logger.Info("Assigning RBAC role",
 		zap.String("roleDefinitionId", assignment.RoleDefinitionID),
 		zap.String("scope", assignment.Scope),
 		zap.String("principalId", assignment.PrincipalID),
@@ -207,11 +207,11 @@ func (r *Reconciler) AssignRole(
 		},
 	}
 
-	_, err := r.roleClient.Create(ctx, assignment.Scope, assignmentName, params, nil)
+	_, err := p.roleClient.Create(ctx, assignment.Scope, assignmentName, params, nil)
 	if err != nil {
 		// Check if already exists (idempotent).
 		if isAlreadyExistsError(err) {
-			r.logger.Debug("Role assignment already exists",
+			p.logger.Debug("Role assignment already exists",
 				zap.String("assignmentName", assignmentName),
 			)
 			return nil
@@ -219,7 +219,7 @@ func (r *Reconciler) AssignRole(
 		return fmt.Errorf("%w: %v", ErrRBACAssignmentFailed, err)
 	}
 
-	r.logger.Info("RBAC role assigned",
+	p.logger.Info("RBAC role assigned",
 		zap.String("assignmentName", assignmentName),
 	)
 
@@ -227,8 +227,8 @@ func (r *Reconciler) AssignRole(
 }
 
 // WaitForRBACPropagation waits for RBAC changes to propagate.
-func (r *Reconciler) WaitForRBACPropagation(ctx context.Context, delay time.Duration) error {
-	r.logger.Info("Waiting for RBAC propagation",
+func (p *Provisioner) WaitForRBACPropagation(ctx context.Context, delay time.Duration) error {
+	p.logger.Info("Waiting for RBAC propagation",
 		zap.Duration("delay", delay),
 	)
 
@@ -241,7 +241,7 @@ func (r *Reconciler) WaitForRBACPropagation(ctx context.Context, delay time.Dura
 }
 
 // VerifyIdentityExists checks if an identity exists.
-func (r *Reconciler) VerifyIdentityExists(
+func (p *Provisioner) VerifyIdentityExists(
 	ctx context.Context,
 	name string,
 	resourceGroup string,
@@ -249,7 +249,7 @@ func (r *Reconciler) VerifyIdentityExists(
 	ctx, cancel := context.WithTimeout(ctx, IdentityCheckTimeout)
 	defer cancel()
 
-	_, err := r.identitiesClient.Get(ctx, resourceGroup, name, nil)
+	_, err := p.identitiesClient.Get(ctx, resourceGroup, name, nil)
 	if err != nil {
 		if isNotFoundError(err) {
 			return false, nil
@@ -261,12 +261,12 @@ func (r *Reconciler) VerifyIdentityExists(
 }
 
 // GetIdentity retrieves an existing identity.
-func (r *Reconciler) GetIdentity(
+func (p *Provisioner) GetIdentity(
 	ctx context.Context,
 	name string,
 	resourceGroup string,
 ) (*OperatorIdentity, error) {
-	resp, err := r.identitiesClient.Get(ctx, resourceGroup, name, nil)
+	resp, err := p.identitiesClient.Get(ctx, resourceGroup, name, nil)
 	if err != nil {
 		if isNotFoundError(err) {
 			return nil, ErrIdentityNotFound
