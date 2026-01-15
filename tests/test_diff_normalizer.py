@@ -60,7 +60,9 @@ class TestNormalizationRule:
         )
 
         assert rule.matches("Microsoft.Network/firewalls", "properties.enabled") is True
-        assert rule.matches("Microsoft.Network/firewalls", "properties.features.logging.enabled") is True
+        assert rule.matches(
+            "Microsoft.Network/firewalls", "properties.features.logging.enabled"
+        ) is True
         assert rule.matches("Microsoft.Network/firewalls", "properties.name") is False
 
     def test_matches_case_insensitive(self) -> None:
@@ -171,7 +173,7 @@ class TestDiffNormalizer:
 
     def test_are_equivalent_boolean_string_vs_bool(self, normalizer: DiffNormalizer) -> None:
         """Test string 'true' is equivalent to True."""
-        is_equiv, reason = normalizer.are_equivalent(
+        is_equiv, _reason = normalizer.are_equivalent(
             before="true",
             after=True,
             resource_type="Microsoft.Network/firewalls",
@@ -181,7 +183,7 @@ class TestDiffNormalizer:
 
     def test_are_equivalent_case_difference(self, normalizer: DiffNormalizer) -> None:
         """Test case differences are normalized."""
-        is_equiv, reason = normalizer.are_equivalent(
+        is_equiv, _reason = normalizer.are_equivalent(
             before="Standard",
             after="standard",
             resource_type="Microsoft.Network/publicIPAddresses",
@@ -379,7 +381,11 @@ class TestWhatIfDiffProcessor:
         """Test filtering a delta list."""
         delta = [
             {"path": "properties.tags", "before": [], "after": None},  # Equivalent
-            {"path": "properties.addressSpace", "before": "10.0.0.0/16", "after": "10.0.0.0/24"},  # Significant
+            {  # Significant
+                "path": "properties.addressSpace",
+                "before": "10.0.0.0/16",
+                "after": "10.0.0.0/24",
+            },
         ]
 
         filtered, normalized_count = processor.filter_delta(

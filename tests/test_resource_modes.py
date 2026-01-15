@@ -8,8 +8,6 @@ from controller.config import ReconciliationMode
 from controller.resource_modes import (
     HIGH_RISK_RESOURCE_TYPES,
     LOW_RISK_RESOURCE_TYPES,
-    ModeOverrideAction,
-    ModeOverrideResult,
     ModeResolver,
     ResourceModeOverride,
     SpecModeConfig,
@@ -200,7 +198,7 @@ class TestModeResolver:
         # Escalation blocked by default
         assert result.effective_mode == ReconciliationMode.OBSERVE
 
-    def test_spec_default_mode_with_escalation(self, resolver_observe: ModeResolver) -> None:
+    def test_spec_default_mode_with_escalation(self) -> None:
         """Test spec default mode with escalation allowed."""
         resolver = ModeResolver(
             global_mode=ReconciliationMode.OBSERVE,
@@ -243,7 +241,9 @@ class TestModeResolver:
         )
         assert result.effective_mode == ReconciliationMode.ENFORCE
 
-    def test_auto_protect_high_risk_resources(self, resolver_with_auto_protect: ModeResolver) -> None:
+    def test_auto_protect_high_risk_resources(
+        self, resolver_with_auto_protect: ModeResolver
+    ) -> None:
         """Test auto-protect for high-risk resource types."""
         # High-risk resource should be protected
         result = resolver_with_auto_protect.resolve(
@@ -258,7 +258,7 @@ class TestModeResolver:
         )
         assert result.effective_mode == ReconciliationMode.OBSERVE
 
-    def test_global_override_takes_precedence(self, resolver_observe: ModeResolver) -> None:
+    def test_global_override_takes_precedence(self) -> None:
         """Test that global overrides take precedence over spec overrides."""
         resolver = ModeResolver(
             global_mode=ReconciliationMode.OBSERVE,

@@ -16,24 +16,18 @@ guarantees are maintained.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Any
 
 import pytest
-import yaml
 from azure_mock import MockAzureContext
-from azure_mock.resources import MockResource, MockWhatIfChange, WhatIfChangeType
+from azure_mock.resources import WhatIfChangeType
 
 from controller.approval import (
-    ConfidenceLevel,
     HIGH_RISK_RESOURCE_TYPES,
-    RiskAssessor,
     ApprovalConfig,
+    ConfidenceLevel,
+    RiskAssessor,
 )
-from controller.config import Config, DeploymentScope, ReconciliationMode
-from controller.reconciler import Reconciler
 
 
 def create_assessor() -> RiskAssessor:

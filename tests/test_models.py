@@ -290,7 +290,7 @@ class TestSpecRegistry:
 
 class TestRoleAssignmentDefinitionSecurity:
     """Tests for RoleAssignmentDefinition security validators.
-    
+
     These tests verify that bootstrap RBAC definitions enforce:
     1. No high-privilege roles (Owner, User Access Administrator, Contributor)
     2. No overly broad scopes (tenant root, root management group)
@@ -385,7 +385,8 @@ class TestRoleAssignmentDefinitionSecurity:
             )
 
         # The validation catches the '/' as tenant root
-        assert "tenant root" in str(exc_info.value).lower() or "denied" in str(exc_info.value).lower()
+        error_msg = str(exc_info.value).lower()
+        assert "tenant root" in error_msg or "denied" in error_msg
 
     def test_deny_root_management_group_scope(
         self, monkeypatch: pytest.MonkeyPatch

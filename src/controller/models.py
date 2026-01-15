@@ -1337,7 +1337,8 @@ class RoleAssignmentDefinition(BaseModel):
                     f"Scope to a child management group or subscription instead."
                 )
 
-        # Validate scope format - must start with /subscriptions/ or /providers/Microsoft.Management/managementGroups/{id}
+        # Validate scope format
+        # Must start with /subscriptions/ or /providers/Microsoft.Management/managementGroups/{id}
         if not scope_lower.startswith("/subscriptions/"):
             # Check if it's a valid management group scope with an ID
             if scope_lower.startswith("/providers/microsoft.management/managementgroups/"):

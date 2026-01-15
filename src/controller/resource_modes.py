@@ -133,9 +133,10 @@ class ResourceModeOverride(BaseModel):
             return False
 
         # Check resource type patterns
-        if self.resource_types:
-            if not self._matches_any_pattern(resource_type, self.resource_types):
-                return False
+        if self.resource_types and not self._matches_any_pattern(
+            resource_type, self.resource_types
+        ):
+            return False
 
         # Check resource group patterns
         if self.resource_groups:
@@ -459,8 +460,12 @@ def create_mode_resolver_from_env(global_mode: ReconciliationMode) -> ModeResolv
     import json
     import os
 
-    auto_protect = os.environ.get("AUTO_PROTECT_HIGH_RISK", "true").lower() in ("true", "1", "yes")
-    allow_escalation = os.environ.get("ALLOW_SPEC_ESCALATION", "false").lower() in ("true", "1", "yes")
+    auto_protect = os.environ.get(
+        "AUTO_PROTECT_HIGH_RISK", "true"
+    ).lower() in ("true", "1", "yes")
+    allow_escalation = os.environ.get(
+        "ALLOW_SPEC_ESCALATION", "false"
+    ).lower() in ("true", "1", "yes")
 
     # Parse global overrides from JSON if provided
     global_overrides: list[ResourceModeOverride] = []

@@ -178,7 +178,7 @@ class DependencyGraph:
             CyclicDependencyError: If a cycle is detected.
         """
         # Kahn's algorithm for topological sort / cycle detection
-        in_degree: dict[str, int] = {node: 0 for node in self.nodes}
+        in_degree: dict[str, int] = dict.fromkeys(self.nodes, 0)
         for node in self.nodes.values():
             for dep in node.depends_on:
                 if dep in in_degree:
@@ -218,7 +218,7 @@ class DependencyGraph:
 
         # Build adjacency list (reversed - edges point to dependents)
         dependents: dict[str, list[str]] = {node: [] for node in self.nodes}
-        in_degree: dict[str, int] = {node: 0 for node in self.nodes}
+        in_degree: dict[str, int] = dict.fromkeys(self.nodes, 0)
 
         for node in self.nodes.values():
             for dep in node.depends_on:
@@ -332,7 +332,7 @@ class DependencyChecker:
     def __init__(
         self,
         config: DependencyConfig | None = None,
-        credential: "ManagedIdentityCredential | None" = None,
+        credential: ManagedIdentityCredential | None = None,
         subscription_id: str | None = None,
     ) -> None:
         """Initialize dependency checker.
@@ -463,7 +463,7 @@ class DependencyChecker:
         self,
         dependency_domain: str,
         subscription_id: str | None,
-        management_group_id: str | None,
+        _management_group_id: str | None,
     ) -> DependencyStatus:
         """Check a single dependency using Resource Graph.
 

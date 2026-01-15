@@ -5,14 +5,13 @@ from __future__ import annotations
 import pytest
 
 from controller.dependency import (
+    KNOWN_DEPENDENCIES,
     CyclicDependencyError,
     DependencyChecker,
     DependencyConfig,
     DependencyGraph,
     DependencyNode,
     DependencyStatus,
-    KNOWN_DEPENDENCIES,
-    UnsatisfiedDependencyError,
     get_suggested_dependencies,
     validate_dependency_declaration,
 )
@@ -53,7 +52,7 @@ class TestDependencyGraph:
         """Test adding nodes."""
         graph = DependencyGraph()
         graph.add_node("firewall", ["hub-network"])
-        
+
         assert "firewall" in graph.nodes
         assert "hub-network" in graph.nodes  # Auto-created
         assert graph.nodes["firewall"].depends_on == ["hub-network"]
@@ -64,7 +63,7 @@ class TestDependencyGraph:
         graph.add_node("log-analytics", [])
         graph.add_node("hub-network", ["log-analytics"])
         graph.add_node("firewall", ["hub-network", "log-analytics"])
-        
+
         # Should not raise
         graph.validate()
 
@@ -74,7 +73,7 @@ class TestDependencyGraph:
         graph.add_node("a", ["b"])
         graph.add_node("b", ["c"])
         graph.add_node("c", ["a"])  # Cycle: a -> b -> c -> a
-        
+
         with pytest.raises(CyclicDependencyError, match="Circular dependency"):
             graph.validate()
 
@@ -84,9 +83,9 @@ class TestDependencyGraph:
         graph.add_node("log-analytics", [])
         graph.add_node("hub-network", ["log-analytics"])
         graph.add_node("firewall", ["hub-network"])
-        
+
         order = graph.topological_sort()
-        
+
         # log-analytics must come before hub-network
         assert order.index("log-analytics") < order.index("hub-network")
         # hub-network must come before firewall
@@ -98,9 +97,9 @@ class TestDependencyGraph:
         graph.add_node("log-analytics", [])
         graph.add_node("hub-network", ["log-analytics"])
         graph.add_node("firewall", ["hub-network", "log-analytics"])
-        
+
         order = graph.topological_sort()
-        
+
         # Both deps must come before firewall
         assert order.index("log-analytics") < order.index("firewall")
         assert order.index("hub-network") < order.index("firewall")
@@ -111,9 +110,9 @@ class TestDependencyGraph:
         graph.add_node("log-analytics", [])
         graph.add_node("hub-network", ["log-analytics"])
         graph.add_node("firewall", ["hub-network"])
-        
+
         ready = graph.get_ready_domains(satisfied=set())
-        
+
         # Only log-analytics has no deps
         assert ready == ["log-analytics"]
 
@@ -123,9 +122,9 @@ class TestDependencyGraph:
         graph.add_node("log-analytics", [])
         graph.add_node("hub-network", ["log-analytics"])
         graph.add_node("firewall", ["hub-network"])
-        
+
         ready = graph.get_ready_domains(satisfied={"log-analytics"})
-        
+
         # Now hub-network can proceed
         assert ready == ["hub-network"]
 
@@ -134,9 +133,9 @@ class TestDependencyGraph:
         graph = DependencyGraph()
         graph.add_node("log-analytics", [])
         graph.add_node("hub-network", ["log-analytics"])
-        
+
         ready = graph.get_ready_domains(satisfied={"log-analytics", "hub-network"})
-        
+
         # Nothing left to deploy
         assert ready == []
 
@@ -161,7 +160,7 @@ class TestDependencyConfig:
             "VERIFY_DEPENDENCIES_VIA_GRAPH",
         ]:
             monkeypatch.delenv(var, raising=False)
-        
+
         config = DependencyConfig.from_env()
         assert config.enforce_dependencies is True
 
@@ -225,9 +224,9 @@ class TestDependencyChecker:
     def test_mark_satisfied(self, checker_no_verify: DependencyChecker) -> None:
         """Test marking a domain as satisfied."""
         checker_no_verify.mark_satisfied("log-analytics")
-        
+
         # Now log-analytics should be in the cache
-        satisfied, unsatisfied = checker_no_verify.check_dependencies(
+        satisfied, _unsatisfied = checker_no_verify.check_dependencies(
             domain="firewall",
             depends_on=["log-analytics"],
             subscription_id="sub-1",
@@ -238,7 +237,7 @@ class TestDependencyChecker:
         """Test clearing the satisfied cache."""
         checker_no_verify.mark_satisfied("log-analytics")
         checker_no_verify.clear_cache()
-        
+
         # Cache is cleared - verification would be needed again
         # But without verify_via_resource_graph, it returns SATISFIED
         satisfied, _ = checker_no_verify.check_dependencies(

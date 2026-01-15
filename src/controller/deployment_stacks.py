@@ -380,11 +380,7 @@ def should_enable_stack_protection(
 
     # Optional domains: check environment
     env_enabled = os.environ.get("STACK_PROTECTION_OPTIONAL_DOMAINS", "false").lower()
-    if env_enabled in ("true", "1", "yes"):
-        return True
-
-    # Default: disabled for optional domains
-    return False
+    return env_enabled in ("true", "1", "yes")
 
 
 @dataclass

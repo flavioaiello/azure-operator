@@ -36,7 +36,9 @@ MIN_PAUSE_DURATION_SECONDS: int = 60  # 1 minute minimum
 MAX_EMERGENCY_WINDOW_SECONDS: int = 3600  # 1 hour
 
 # Pattern for valid pause scope formats
-VALID_PAUSE_SCOPE_PATTERN = r"^(domain|subscription|management_group|resource_group):[a-zA-Z0-9_\-]+$"
+VALID_PAUSE_SCOPE_PATTERN = (
+    r"^(domain|subscription|management_group|resource_group):[a-zA-Z0-9_\-]+$"
+)
 
 
 class PauseReason(str, Enum):

@@ -27,7 +27,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -610,7 +610,8 @@ class PRGateValidator:
         # Check target branch
         if pr_info.target_branch not in self._config.allowed_branches:
             errors.append(
-                f"Target branch {pr_info.target_branch} not in allowed: {self._config.allowed_branches}"
+                f"Target branch {pr_info.target_branch} not in allowed: "
+                f"{self._config.allowed_branches}"
             )
 
         # Check commit age
@@ -634,10 +635,7 @@ class PRGateValidator:
                 errors.append(f"Missing CODEOWNERS approvals: {', '.join(missing)}")
 
         # Determine final status
-        if errors:
-            status = PRApprovalStatus.PENDING
-        else:
-            status = PRApprovalStatus.APPROVED
+        status = PRApprovalStatus.PENDING if errors else PRApprovalStatus.APPROVED
 
         result = PRValidationResult(
             status=status,

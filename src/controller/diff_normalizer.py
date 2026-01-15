@@ -95,16 +95,16 @@ class NormalizationRule:
             True if this rule applies.
         """
         # Check resource type
-        if self.resource_type != "*":
-            if not self._glob_match(resource_type.lower(), self.resource_type.lower()):
-                return False
+        if self.resource_type != "*" and not self._glob_match(
+            resource_type.lower(), self.resource_type.lower()
+        ):
+            return False
 
         # Check path pattern
-        if self.path_pattern != "*":
-            if not self._glob_match(path.lower(), self.path_pattern.lower()):
-                return False
-
-        return True
+        return not (
+            self.path_pattern != "*"
+            and not self._glob_match(path.lower(), self.path_pattern.lower())
+        )
 
     def _glob_match(self, value: str, pattern: str) -> bool:
         """Simple glob matching with * and ** support."""
@@ -368,7 +368,7 @@ class DiffNormalizer:
         "100" -> 100
         "3.14" -> 3.14
         """
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return value
         if isinstance(value, str):
             try:
@@ -480,7 +480,7 @@ class DiffNormalizer:
 
     def _deep_equal(self, a: Any, b: Any) -> bool:
         """Deep equality check for complex nested structures."""
-        if type(a) != type(b):
+        if type(a) is not type(b):
             return False
 
         if isinstance(a, dict):
@@ -488,17 +488,17 @@ class DiffNormalizer:
                 return False
             return all(self._deep_equal(a[k], b[k]) for k in a)
 
-        if isinstance(a, (list, tuple)):
+        if isinstance(a, list | tuple):
             if len(a) != len(b):
                 return False
-            return all(self._deep_equal(x, y) for x, y in zip(a, b))
+            return all(self._deep_equal(x, y) for x, y in zip(a, b, strict=True))
 
         return a == b
 
     def _get_equivalence_reason(
         self,
-        before: Any,
-        after: Any,
+        _before: Any,
+        _after: Any,
         resource_type: str,
         path: str,
     ) -> str:

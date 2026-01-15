@@ -13,7 +13,6 @@ Tests cover:
 
 from __future__ import annotations
 
-import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -23,7 +22,6 @@ from controller.pr_gate import (
     CRITICAL_DOMAINS,
     CodeOwner,
     CodeOwnersMissingError,
-    CommitTooOldError,
     MockPRProvider,
     PRApprovalStatus,
     PRGateConfig,
@@ -31,7 +29,6 @@ from controller.pr_gate import (
     PRGateValidator,
     PRInfo,
     PRNotApprovedError,
-    PRValidationResult,
     PromotionEnvironment,
     PromotionState,
     compute_spec_hash,
@@ -41,7 +38,6 @@ from controller.pr_gate import (
     load_codeowners_from_file,
     parse_codeowners,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -752,7 +748,7 @@ class TestPromotionState:
         """Test staging allowed after development."""
         state = PromotionState(commit_sha="abc123", spec_hash="hash123")
         state.record_promotion(PromotionEnvironment.DEVELOPMENT)
-        is_valid, error = state.validate_promotion_path(PromotionEnvironment.STAGING)
+        is_valid, _error = state.validate_promotion_path(PromotionEnvironment.STAGING)
         assert is_valid is True
 
     def test_validate_promotion_path_production_requires_staging(self) -> None:
@@ -816,11 +812,13 @@ class TestEnvironmentDetection:
 
     def test_feature_is_development(self) -> None:
         """Test feature/* branch is development."""
-        assert detect_environment_from_branch("feature/my-feature") == PromotionEnvironment.DEVELOPMENT
+        result = detect_environment_from_branch("feature/my-feature")
+        assert result == PromotionEnvironment.DEVELOPMENT
 
     def test_unknown_branch_defaults_to_development(self) -> None:
         """Test unknown branch defaults to development."""
-        assert detect_environment_from_branch("some-random-branch") == PromotionEnvironment.DEVELOPMENT
+        result = detect_environment_from_branch("some-random-branch")
+        assert result == PromotionEnvironment.DEVELOPMENT
 
 
 # =============================================================================
