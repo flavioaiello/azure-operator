@@ -1,3 +1,4 @@
+//nolint:errcheck // Test file - setup errors and type assertions are acceptable
 package loader
 
 import (
@@ -198,11 +199,11 @@ func TestLoader_LoadTemplate_Valid(t *testing.T) {
 func TestOperatorToTemplate_Complete(t *testing.T) {
 	// Verify key operators are mapped.
 	expectedMappings := map[string]string{
-		"bootstrap":     "identity",
-		"firewall":      "connectivity",
+		"bootstrap":              "identity",
+		"firewall":               "connectivity",
 		testOperatorLogAnalytics: "management",
-		"defender":      "security",
-		"policy":        "identity",
+		"defender":               "security",
+		"policy":                 "identity",
 	}
 
 	for operator, expectedTemplate := range expectedMappings {

@@ -1,3 +1,4 @@
+//nolint:errcheck // Test file - setup errors are acceptable
 package dependency
 
 import (

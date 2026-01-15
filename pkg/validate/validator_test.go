@@ -1,3 +1,4 @@
+//nolint:errcheck // Test file - setup errors are acceptable
 package validate
 
 import (
@@ -18,7 +19,7 @@ const (
 )
 
 func TestNewValidator(t *testing.T) {
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	v := NewValidator(logger)
 	assert.NotNil(t, v)
 }
@@ -38,7 +39,7 @@ spec:
 	err := os.WriteFile(specPath, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	v := NewValidator(logger)
 
 	result, err := v.ValidateSpecFile(context.Background(), specPath)
@@ -56,7 +57,7 @@ func TestValidateSpecFileMissingFields(t *testing.T) {
 	err := os.WriteFile(specPath, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	v := NewValidator(logger)
 
 	result, err := v.ValidateSpecFile(context.Background(), specPath)
@@ -74,7 +75,7 @@ func TestValidateSpecFileInvalidYAML(t *testing.T) {
 	err := os.WriteFile(specPath, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	v := NewValidator(logger)
 
 	result, err := v.ValidateSpecFile(context.Background(), specPath)
@@ -100,7 +101,7 @@ spec:
 	err = os.WriteFile(filepath.Join(dir, "subnet.yaml"), []byte(spec2), 0o644)
 	require.NoError(t, err)
 
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	v := NewValidator(logger)
 
 	results, err := v.ValidateSpecDirectory(context.Background(), dir)
@@ -130,7 +131,7 @@ func TestValidateTemplateARM(t *testing.T) {
 	err := os.WriteFile(templatePath, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	v := NewValidator(logger)
 
 	result, err := v.ValidateTemplate(context.Background(), templatePath)
@@ -150,7 +151,7 @@ func TestValidateTemplateARMMissingSchema(t *testing.T) {
 	err := os.WriteFile(templatePath, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	v := NewValidator(logger)
 
 	result, err := v.ValidateTemplate(context.Background(), templatePath)
@@ -171,7 +172,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2021-02-01' = {
 	err := os.WriteFile(templatePath, []byte(content), 0o644)
 	require.NoError(t, err)
 
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	v := NewValidator(logger)
 
 	result, err := v.ValidateTemplate(context.Background(), templatePath)
@@ -205,7 +206,7 @@ spec:
 	err = os.WriteFile(filepath.Join(dir1, "subnet.yaml"), []byte(extraSpec), 0o644)
 	require.NoError(t, err)
 
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewDevelopment() //nolint:errcheck // Test setup
 	v := NewValidator(logger)
 
 	differences, err := v.CompareSpecs(context.Background(), dir1, dir2)

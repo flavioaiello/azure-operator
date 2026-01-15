@@ -1,3 +1,4 @@
+//nolint:errcheck // Test file - setup errors are acceptable
 package pause
 
 import (
@@ -120,7 +121,7 @@ func TestCleanupExpired(t *testing.T) {
 	assert.Equal(t, 1, count)
 
 	// operator1 should be auto-resumed.
-	state, _ := m.GetState("operator1")
+	state, _ := m.GetState("operator1") //nolint:errcheck // Test assertion
 	assert.False(t, state.Paused)
 	assert.NotNil(t, state.ResumedAt)
 }
@@ -135,14 +136,14 @@ func TestShouldReconcile(t *testing.T) {
 	assert.Nil(t, state)
 
 	// Pause it.
-	_ = m.Pause("operator1", PauseReasonManual, "", "admin")
+	_ = m.Pause("operator1", PauseReasonManual, "", "admin") //nolint:errcheck // Test setup
 
 	should, state = m.ShouldReconcile("operator1")
 	assert.False(t, should)
 	assert.NotNil(t, state)
 
 	// Resume.
-	_ = m.Resume("operator1")
+	_ = m.Resume("operator1") //nolint:errcheck // Test setup
 
 	should, state = m.ShouldReconcile("operator1")
 	assert.True(t, should)
@@ -154,7 +155,7 @@ func TestLoadStates(t *testing.T) {
 	m := NewManager(dir)
 
 	// Create initial state.
-	_ = m.Pause("operator1", PauseReasonManual, "test", "admin")
+	_ = m.Pause("operator1", PauseReasonManual, "test", "admin") //nolint:errcheck // Test setup
 
 	// Create new manager and load.
 	m2 := NewManager(dir)
@@ -169,7 +170,7 @@ func TestPersistState(t *testing.T) {
 	dir := t.TempDir()
 	m := NewManager(dir)
 
-	_ = m.Pause("operator1", PauseReasonMaintenance, "test", "admin")
+	_ = m.Pause("operator1", PauseReasonMaintenance, "test", "admin") //nolint:errcheck // Test setup
 
 	// Check file exists.
 	pauseFile := filepath.Join(dir, "operator1", PauseFileName)
