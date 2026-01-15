@@ -6,10 +6,6 @@
 
 A **Go-based, stateless operator framework** for continuously reconciling Azure Landing Zones. Inspired by Kubernetes controller patterns, designed for Azure's unique characteristics.
 
-> **Architecture Note:** This project is split into two repositories:
-> - **[azure-controller](https://github.com/flavioaiello/azure-controller)** — Generic reconciliation engine (Go)
-> - **azure-operator** (this repo) — Azure Landing Zone specs, templates, and CLI (Go + Bicep)
-
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fflavioaiello%2Fazure-operator%2Fmain%2Fportal%2FmainTemplate.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fflavioaiello%2Fazure-operator%2Fmain%2Fportal%2FcreateUiDefinition.json)
 
 [![Go 1.24+](https://img.shields.io/badge/go-1.24%2B-00ADD8.svg)](https://golang.org/)
@@ -17,7 +13,7 @@ A **Go-based, stateless operator framework** for continuously reconciling Azure 
 [![Azure SDK for Go](https://img.shields.io/badge/Azure%20SDK-Latest-0078D4.svg)](https://github.com/Azure/azure-sdk-for-go)
 [![AVM Modules](https://img.shields.io/badge/Bicep-AVM%20Modules-0078D4.svg)](https://aka.ms/avm)
 [![Security: Secretless](https://img.shields.io/badge/security-secretless-brightgreen.svg)](#secretless-architecture-mandatory)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/flavioaiello/azure-controller)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](https://github.com/flavioaiello/azure-operator)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-flavioaiello%2Fazure--operator-blue.svg?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNNCAxOWg0djJINHoiLz48cGF0aCBkPSJNMTAgMTloNHYyaC00eiIvPjxwYXRoIGQ9Ik0xNiAxOWg0djJoLTR6Ii8+PHBhdGggZD0iTTQgMTFoMTZ2Mkg0eiIvPjxwYXRoIGQ9Ik00IDNoMTZ2Mkg0eiIvPjxwYXRoIGQ9Ik04IDN2MTYiLz48cGF0aCBkPSJNMTYgM3YxNiIvPjwvc3ZnPg==)](https://deepwiki.com/flavioaiello/azure-operator)
 
 ---
@@ -88,7 +84,7 @@ The operators use AVM modules from the [Bicep Public Registry](https://github.co
 
 ## TL;DR
 
-> **What:** Python operators that continuously reconcile Azure Landing Zones using GitOps.
+> **What:** Go operators that continuously reconcile Azure Landing Zones using GitOps.
 >
 > **How:** YAML specs → ARM WhatIf (drift detection) → ARM deployment (apply). No Terraform state files.
 >
@@ -459,7 +455,7 @@ This framework enforces a **secretless security model** — there are zero secre
 - `AZURE_CLIENT_CERTIFICATE_PASSWORD`
 - `AZURE_USERNAME` / `AZURE_PASSWORD`
 
-See [auth package](https://github.com/flavioaiello/azure-controller/tree/main/pkg/auth) in azure-controller for the enforcement implementation.
+See [pkg/auth](pkg/auth) for the enforcement implementation.
 
 > **Scope Clarification:** "Secretless" applies to **Azure ARM access** — all Azure API calls use Managed Identity tokens. Git repository access (for spec sync) has two options:
 > 1. **Azure DevOps/GitHub with Managed Identity** — Use workload identity federation to authenticate git-sync with MI tokens (fully secretless)
@@ -1026,14 +1022,8 @@ Dependencies are enforced via `depends_on` in specs or auto-detected from `KNOWN
 
 ## Package Reference
 
-The operator framework is split across two repositories:
-
-### azure-controller (Generic Reconciliation Engine)
-
-Located at [github.com/flavioaiello/azure-controller](https://github.com/flavioaiello/azure-controller):
-
 | Package | Purpose | Key Types |
-|---------|---------|-----------|
+|---------|---------|----------|
 | **pkg/reconciler** | Core reconciliation loop | `Reconciler`, `Spec`, `SpecLoader` |
 | **pkg/config** | Configuration management | `Config`, `ReconciliationMode` |
 | **pkg/deploy** | ARM deployment execution | `Deployer`, `DeploymentResult` |
@@ -1050,16 +1040,10 @@ Located at [github.com/flavioaiello/azure-controller](https://github.com/flavioa
 | **pkg/graph** | Fast drift detection | `ResourceGraphClient` |
 | **pkg/provenance** | Audit trail & logging | `ProvenanceLogger` |
 | **pkg/provisioner** | Identity/RBAC provisioning | `Provisioner` |
-
-### azure-operator (Azure Landing Zone Implementation)
-
-This repository:
-
-| Package | Purpose | Key Types |
-|---------|---------|-----------|
 | **pkg/specs** | Generic spec model | `Spec`, `GenericSpec` |
 | **pkg/loader** | YAML/template loading | `Loader`, `SpecLoader` |
 | **cmd/azo** | CLI tool | Cobra-based CLI |
+| **cmd/controller** | Controller entry point | Main binary |
 
 ### Spec File Format
 
@@ -1090,17 +1074,11 @@ See individual spec files in `archetypes/*/specs/` directory for domain-specific
 ### Quick Start
 
 ```bash
-# Clone both repositories
-git clone https://github.com/flavioaiello/azure-controller
+# Clone repository
 git clone https://github.com/flavioaiello/azure-operator
-
-# Build and test azure-operator
 cd azure-operator
-go build ./...
-go test ./...
 
-# Build and test azure-controller
-cd ../azure-controller
+# Build and test
 go build ./...
 go test ./...
 ```
@@ -1151,7 +1129,6 @@ azo run --help
 
 ## Related Projects
 
-- **[azure-controller](https://github.com/flavioaiello/azure-controller)** — Generic reconciliation engine (required dependency)
 - **[Enterprise Policy as Code (EPAC)](https://aka.ms/epac)** — Recommended for Azure Policy management
 - **[Azure Verified Modules (AVM)](https://aka.ms/avm)** — Microsoft's official Bicep module library
 ---
