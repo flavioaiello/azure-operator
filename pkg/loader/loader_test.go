@@ -9,69 +9,70 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetTemplateForOperator(t *testing.T) {
+func TestGetTemplateDir(t *testing.T) {
 	tests := []struct {
 		operator string
 		expected string
-		wantErr  bool
 	}{
-		{"firewall", "connectivity", false},
-		{"bastion", "connectivity", false},
-		{"hub-network", "connectivity", false},
-		{"log-analytics", "management", false},
-		{"automation", "management", false},
-		{"defender", "security", false},
-		{"keyvault", "security", false},
-		{"bootstrap", "identity", false},
-		{"policy", "identity", false},
-		{"firewall-secondary", "connectivity", false},
-		{"unknown-operator", "", true},
+		{"firewall", "connectivity"},
+		{"bastion", "connectivity"},
+		{"hub-network", "connectivity"},
+		{"log-analytics", "management"},
+		{"automation", "management"},
+		{"defender", "security"},
+		{"keyvault", "security"},
+		{"bootstrap", "identity"},
+		{"policy", "identity"},
+		{"firewall-secondary", "connectivity"},
+		{"unknown-operator", "unknown-operator"}, // Falls back to operator name.
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.operator, func(t *testing.T) {
-			template, err := GetTemplateForOperator(tt.operator)
-			if tt.wantErr {
-				assert.Error(t, err)
-				assert.ErrorIs(t, err, ErrUnknownDomain)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expected, template)
-			}
+			result := GetTemplateDir(tt.operator)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
 func TestLoader_LoadSpec_Valid(t *testing.T) {
-	// Create temp directory with spec file.
 	tempDir := t.TempDir()
 
+	// Generic spec - passes through to AVM.
 	specContent := `
-logAnalytics:
-  name: log-test
-  retentionDays: 365
-  sku: PerGB2018
 location: westeurope
 resourceGroupName: rg-test
 tags:
   environment: test
+virtualNetwork:
+  name: vnet-hub
+  addressSpace:
+    - "10.0.0.0/16"
+firewall:
+  enabled: true
+  sku: Premium
 `
-	specPath := filepath.Join(tempDir, "management.yaml")
+	specPath := filepath.Join(tempDir, "connectivity.yaml")
 	require.NoError(t, os.WriteFile(specPath, []byte(specContent), 0644))
 
-	loader := New(tempDir, tempDir, nil)
-	spec, err := loader.LoadSpec("management")
+	loader := New(tempDir, tempDir)
+	spec, err := loader.LoadSpec("connectivity")
 	require.NoError(t, err)
 	assert.NotNil(t, spec)
+	assert.Equal(t, "connectivity", spec.GetOperator())
 
 	params := spec.ToARMParameters()
-	assert.Equal(t, "log-test", params["logAnalyticsName"].(map[string]interface{})["value"])
 	assert.Equal(t, "westeurope", params["location"].(map[string]interface{})["value"])
+	assert.Equal(t, "rg-test", params["resourceGroupName"].(map[string]interface{})["value"])
+
+	// Verify pass-through parameters.
+	assert.Contains(t, params, "virtualNetwork")
+	assert.Contains(t, params, "firewall")
 }
 
 func TestLoader_LoadSpec_NotFound(t *testing.T) {
 	tempDir := t.TempDir()
-	loader := New(tempDir, tempDir, nil)
+	loader := New(tempDir, tempDir)
 
 	_, err := loader.LoadSpec("nonexistent")
 	require.Error(t, err)
@@ -82,13 +83,13 @@ func TestLoader_LoadSpec_InvalidYAML(t *testing.T) {
 	tempDir := t.TempDir()
 
 	invalidYAML := `
-logAnalytics:
+virtualNetwork:
   name: [invalid yaml
 `
 	specPath := filepath.Join(tempDir, "invalid.yaml")
 	require.NoError(t, os.WriteFile(specPath, []byte(invalidYAML), 0644))
 
-	loader := New(tempDir, tempDir, nil)
+	loader := New(tempDir, tempDir)
 	_, err := loader.LoadSpec("invalid")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrInvalidYAML)
@@ -102,7 +103,7 @@ func TestLoader_LoadSpec_TooLarge(t *testing.T) {
 	specPath := filepath.Join(tempDir, "large.yaml")
 	require.NoError(t, os.WriteFile(specPath, largeContent, 0644))
 
-	loader := New(tempDir, tempDir, nil)
+	loader := New(tempDir, tempDir)
 	_, err := loader.LoadSpec("large")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrSpecTooLarge)
@@ -111,53 +112,56 @@ func TestLoader_LoadSpec_TooLarge(t *testing.T) {
 func TestLoader_LoadSpec_KubernetesStyle(t *testing.T) {
 	tempDir := t.TempDir()
 
+	// Kubernetes-style wrapper.
 	k8sStyle := `
-apiVersion: azure-operator.io/v1alpha1
-kind: ManagementSpec
+apiVersion: azure-operator/v1
+kind: Operator
 metadata:
-  name: management
+  name: connectivity
 spec:
-  logAnalytics:
-    name: log-k8s-style
-    retentionDays: 90
-    sku: Free
   location: eastus
+  resourceGroupName: rg-connectivity
+  virtualNetwork:
+    name: vnet-hub
+    addressSpace:
+      - "10.0.0.0/16"
 `
-	specPath := filepath.Join(tempDir, "management.yaml")
+	specPath := filepath.Join(tempDir, "connectivity.yaml")
 	require.NoError(t, os.WriteFile(specPath, []byte(k8sStyle), 0644))
 
-	loader := New(tempDir, tempDir, nil)
-	spec, err := loader.LoadSpec("management")
+	loader := New(tempDir, tempDir)
+	spec, err := loader.LoadSpec("connectivity")
 	require.NoError(t, err)
 	assert.NotNil(t, spec)
 
 	params := spec.ToARMParameters()
-	assert.Equal(t, "log-k8s-style", params["logAnalyticsName"].(map[string]interface{})["value"])
 	assert.Equal(t, "eastus", params["location"].(map[string]interface{})["value"])
 }
 
-func TestLoader_LoadSpec_ValidationFailure(t *testing.T) {
+func TestLoader_LoadSpec_DependsOn(t *testing.T) {
 	tempDir := t.TempDir()
 
-	// Invalid: retention days below minimum.
-	invalidSpec := `
-logAnalytics:
-  name: log-test
-  retentionDays: 10
-  sku: PerGB2018
+	specContent := `
+location: westeurope
+dependsOn:
+  - hub-network
+  - log-analytics
 `
-	specPath := filepath.Join(tempDir, "invalid-validation.yaml")
-	require.NoError(t, os.WriteFile(specPath, []byte(invalidSpec), 0644))
+	specPath := filepath.Join(tempDir, "firewall.yaml")
+	require.NoError(t, os.WriteFile(specPath, []byte(specContent), 0644))
 
-	loader := New(tempDir, tempDir, nil)
-	_, err := loader.LoadSpec("invalid-validation")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "validation failed")
+	loader := New(tempDir, tempDir)
+	spec, err := loader.LoadSpec("firewall")
+	require.NoError(t, err)
+
+	deps := spec.GetDependsOn()
+	assert.Contains(t, deps, "hub-network")
+	assert.Contains(t, deps, "log-analytics")
 }
 
 func TestLoader_LoadTemplate_NotFound(t *testing.T) {
 	tempDir := t.TempDir()
-	loader := New(tempDir, tempDir, nil)
+	loader := New(tempDir, tempDir)
 
 	_, err := loader.LoadTemplate("nonexistent")
 	require.Error(t, err)
@@ -168,7 +172,7 @@ func TestLoader_LoadTemplate_Valid(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Create template directory and file.
-	templateDir := filepath.Join(tempDir, "management")
+	templateDir := filepath.Join(tempDir, "connectivity")
 	require.NoError(t, os.MkdirAll(templateDir, 0755))
 
 	templateContent := `{
@@ -179,8 +183,8 @@ func TestLoader_LoadTemplate_Valid(t *testing.T) {
 	templatePath := filepath.Join(templateDir, "main.json")
 	require.NoError(t, os.WriteFile(templatePath, []byte(templateContent), 0644))
 
-	loader := New(tempDir, tempDir, nil)
-	template, err := loader.LoadTemplate("management")
+	loader := New(tempDir, tempDir)
+	template, err := loader.LoadTemplate("connectivity")
 	require.NoError(t, err)
 	assert.NotNil(t, template)
 	assert.Equal(t, "1.0.0.0", template["contentVersion"])
